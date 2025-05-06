@@ -286,6 +286,13 @@ public class IndentRequestService {
         return indentRemarkRepository.save(remark);
     }
 
+    public List<IndentRequest> getIndentsByUserId(Long userId) {
+        if (!userRepository.existsById(userId)) {
+            throw new RuntimeException("User not found");
+        }
+        return indentRequestRepository.findByRequestedById(userId);
+    }
+
     // Get all indents requested by a user
     public List<IndentRequest> getUserIndents(Long userId) {
         return indentRequestRepository.findByRequestedById(userId);

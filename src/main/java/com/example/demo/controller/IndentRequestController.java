@@ -225,6 +225,7 @@
 
 package com.example.demo.controller;
 
+import com.example.demo.dto.IndentDTO;
 import com.example.demo.model.IndentRemark;
 import com.example.demo.model.IndentRequest;
 import com.example.demo.model.IndentStatus;
@@ -242,6 +243,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
 
@@ -341,7 +343,7 @@ public class IndentRequestController {
         return ResponseEntity.ok(indent);
     }
 
-    @PutMapping("/{indentId}/approve-sla")
+    @PutMapping("/{indentId}/approve-store")
     public ResponseEntity<IndentRequest> approveByStore(
             @PathVariable Long indentId,
             @RequestBody String remark
@@ -349,7 +351,7 @@ public class IndentRequestController {
         IndentRequest indent = indentRequestService.approveByStore(indentId, remark);
         return ResponseEntity.ok(indent);
     }
-    @PutMapping("/{indentId}/approve-sla")
+    @PutMapping("/{indentId}/approve-finance")
     public ResponseEntity<IndentRequest> approveByFinance(
             @PathVariable Long indentId,
             @RequestBody String remark
@@ -357,7 +359,7 @@ public class IndentRequestController {
         IndentRequest indent = indentRequestService.approveByFinance(indentId, remark);
         return ResponseEntity.ok(indent);
     }
-    @PutMapping("/{indentId}/approve-sla")
+    @PutMapping("/{indentId}/approve-purchase")
     public ResponseEntity<IndentRequest> approveByPurchase(
             @PathVariable Long indentId,
             @RequestBody String remark
@@ -421,7 +423,8 @@ public class IndentRequestController {
     // ✅ 8. Get all indents created by a user
     @GetMapping("/user/{userId}")
     public ResponseEntity<List<IndentRequest>> getUserIndents(@PathVariable Long userId) {
-        return ResponseEntity.ok(indentRequestService.getUserIndents(userId));
+        //print userID
+        return ResponseEntity.ok(indentRequestService.getFLAIndents(userId));
     }
 
     // ✅ 9. Get all indents assigned to an FLA
