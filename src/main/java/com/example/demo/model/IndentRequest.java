@@ -79,6 +79,8 @@ public class IndentRequest {
 
     private String remarkByFinance;
     private LocalDateTime financeApprovalDate;
+    private String setRemarkByPurchase;
+    private LocalDateTime setPurchaseCompletionDate;
     @ManyToOne
     @JoinColumn(name = "fla_id")
     private User fla; // Assigned FLA

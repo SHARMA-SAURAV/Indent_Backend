@@ -74,12 +74,15 @@ public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Excepti
                     .requestMatchers("/api/indent/sla/pending").authenticated() //  No path variable
                     .requestMatchers("/api/indent/store/approve").authenticated() //  No path variable
                     .requestMatchers("/api/indent/store/pending").authenticated() //  No path variable
+                    .requestMatchers("/api/indent/finance/approve").authenticated() //  No path variable
+                    .requestMatchers("/api/indent/finance/pending").authenticated() //  No path variable
+
 
                     .requestMatchers("/api/indent/{indentId}/assign-sla/{slaId}").hasRole("FLA")
                     .requestMatchers("/api/indent/{indentId}/forward-store").hasRole("SLA")
-                    .requestMatchers("/api/indent//{indentId}/forward-finance").hasRole("STORE")
+                    .requestMatchers("/api/indent/{indentId}/forward-finance").hasRole("STORE")
                     .requestMatchers("/api/indent/{indentId}/forward-purchase").hasRole("FINANCE")
-                    .requestMatchers("/api/indent/{indentId}/complete}").hasRole("PURCHASE")
+                    .requestMatchers("/api/indent/{indentId}/complete").hasRole("PURCHASE")
                     .requestMatchers("/api/indent/user/{userId}").hasRole("USER")
                     .requestMatchers("/api/indent/fla/{flaId}").hasRole("FLA")
                     .requestMatchers("/api/indent/sla/{slaId}").hasRole("SLA")

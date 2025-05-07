@@ -452,47 +452,6 @@ public class IndentRequestController {
         return ResponseEntity.ok(Map.of("message", "Approved and forwarded to Finance"));
     }
 
-    @GetMapping("/finance/pending")
-    public ResponseEntity<?> getPendingIndentsForFinance(Authentication authentication) {
-        if (authentication == null || !authentication.isAuthenticated()) {
-            throw new AccessDeniedException("Not authenticated");
-        }
-
-        List<IndentRequest> pendingIndents = indentRequestRepository.findByStatus(IndentStatus.PENDING_FINANCE);
-        return ResponseEntity.ok(pendingIndents);
-    }
-
-
-
-
-    @PostMapping("/finance/approve")
-    public ResponseEntity<?> approveIndentAsFinance(@RequestBody Map<String, Object> request,
-                                                    Authentication authentication) {
-        if (authentication == null || !authentication.isAuthenticated()) {
-            throw new AccessDeniedException("Not authenticated");
-        }
-
-        Long indentId = Long.valueOf(request.get("indentId").toString());
-        String remark = (String) request.get("remark");
-
-        IndentRequest indent = indentRequestRepository.findById(indentId)
-                .orElseThrow(() -> new RuntimeException("Indent not found"));
-
-        if (indent.getStatus() != IndentStatus.PENDING_FINANCE) {
-            return ResponseEntity.badRequest().body("Indent not in Finance stage");
-        }
-
-        // Set remark and update status
-        indent.setRemarkByFinance(remark);
-        indent.setStatus(IndentStatus.PENDING_PURCHASE);  // Move to Purchase
-        indent.setFinanceApprovalDate(LocalDateTime.now());
-
-        indentRequestRepository.save(indent);
-
-        return ResponseEntity.ok(Map.of("message", "Approved and forwarded to Purchase"));
-    }
-
-
 
 
 
@@ -529,30 +488,85 @@ public class IndentRequestController {
 
 
 
+    @GetMapping("/finance/pending")
+    public ResponseEntity<?> getPendingIndentsForFinance(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new AccessDeniedException("Not authenticated");
+        }
 
-//    @PostMapping("/store/approve")
-//    public ResponseEntity<?> approveByStore(@RequestBody Map<String, String> request, Authentication authentication) {
-//        if (authentication == null || !authentication.isAuthenticated()) {
-//            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
-//        }
-//
-//        Long indentId = Long.valueOf(request.get("indentId"));
-//        String remark = request.get("remark");
-//
-//        IndentRequest indent = indentRequestRepository.findById(indentId)
-//                .orElseThrow(() -> new RuntimeException("Indent not found"));
-//
-//        if (indent.getStatus() != IndentStatus.FORWARDED_TO_STORE) {
-//            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Indent is not pending at Store level");
-//        }
-//
-//        // Update indent status and add remark
-//        indent.setStatus(IndentStatus.FORWARDED_TO_FINANCE);
-//        indent.addRemark("Store", remark); // Custom method you should define to track remarks with roles/timestamps
-//        indentRequestRepository.save(indent);
-//
-//        return ResponseEntity.ok("Approved by Store and forwarded to Finance");
-//    }
+        List<IndentRequest> pendingIndents = indentRequestRepository.findByStatus(IndentStatus.PENDING_FINANCE);
+        return ResponseEntity.ok(pendingIndents);
+    }
+
+
+
+
+    @PostMapping("/finance/approve")
+    public ResponseEntity<?> approveIndentAsFinance(@RequestBody Map<String, Object> request,
+                                                    Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new AccessDeniedException("Not authenticated");
+        }
+        Long indentId = Long.valueOf(request.get("indentId").toString());
+        String remark = (String) request.get("remark");
+
+        IndentRequest indent = indentRequestRepository.findById(indentId)
+                .orElseThrow(() -> new RuntimeException("Indent not found"));
+
+        if (indent.getStatus() != IndentStatus.PENDING_FINANCE) {
+            return ResponseEntity.badRequest().body("Indent not in Finance stage");
+        }
+
+        // Set remark and update status
+        indent.setRemarkByFinance(remark);
+        indent.setStatus(IndentStatus.PENDING_PURCHASE);  // Move to Purchase
+        indent.setFinanceApprovalDate(LocalDateTime.now());
+
+        indentRequestRepository.save(indent);
+
+        return ResponseEntity.ok(Map.of("message", "Approved and forwarded to Purchase"));
+    }
+
+
+    // Get all pending purchase indents
+    @GetMapping("/purchase/pending")
+    public ResponseEntity<?> getPendingIndentsForPurchase(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new AccessDeniedException("Not authenticated");
+        }
+
+        List<IndentRequest> pendingIndents = indentRequestRepository.findByStatus(IndentStatus.PENDING_PURCHASE);
+        return ResponseEntity.ok(pendingIndents);
+    }
+
+
+    // Complete the indent (final approval)
+    @PostMapping("/purchase/complete")
+    public ResponseEntity<?> completeIndent(@RequestBody Map<String, Object> request,
+                                            Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new AccessDeniedException("Not authenticated");
+        }
+
+        Long indentId = Long.valueOf(request.get("indentId").toString());
+        String remark = (String) request.get("remark");
+
+        IndentRequest indent = indentRequestRepository.findById(indentId)
+                .orElseThrow(() -> new RuntimeException("Indent not found"));
+
+        if (indent.getStatus() != IndentStatus.PENDING_PURCHASE) {
+            return ResponseEntity.badRequest().body("Indent not in Purchase stage");
+        }
+
+        indent.setRemarkByPurchase(remark);
+        indent.setStatus(IndentStatus.COMPLETED);
+        indent.setPurchaseCompletionDate(LocalDateTime.now());
+
+        indentRequestRepository.save(indent);
+
+        return ResponseEntity.ok(Map.of("message", "Indent marked as COMPLETED by Purchase"));
+    }
+
 
 
 
