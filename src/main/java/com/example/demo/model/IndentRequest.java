@@ -50,6 +50,8 @@ package com.example.demo.model;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+
+import java.time.LocalDateTime;
 import java.util.Date;
 import java.util.List;
 
@@ -85,5 +87,10 @@ public class IndentRequest {
     private List<IndentRemark> remarks;
 
     private Date createdAt = new Date();
+    private LocalDateTime flaApprovalDate;
+    private String remarkByFla;
+    private String remarkBySla;
+    private LocalDateTime slaApprovalDate;
+
     private Date updatedAt ; // To track the last update time
 }

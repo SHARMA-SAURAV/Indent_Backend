@@ -210,19 +210,6 @@
 //}
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
 package com.example.demo.controller;
 
 import com.example.demo.dto.IndentDTO;
@@ -241,6 +228,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -250,14 +238,14 @@ import java.util.stream.Collectors;
 @RequestMapping("/api/indent")
 public class IndentRequestController {
 
-//    private final IndentRequestRepository indentRequestRepository;
+    private final IndentRequestRepository indentRequestRepository;
     private final IndentRequestService indentRequestService;
     private  final UserRepository userRepository;
 
-    public IndentRequestController(IndentRequestService indentRequestService,UserRepository userRepository) {
+    public IndentRequestController(IndentRequestService indentRequestService,UserRepository userRepository, IndentRequestRepository indentRequestRepository) {
         this.indentRequestService = indentRequestService;
         this.userRepository= userRepository;
-//        this.indentRequestRepository = indentRequestRepository;
+        this.indentRequestRepository = indentRequestRepository;
     }
 //System.out.println("we are outside the create indent");
 //    // ✅ 1. Create an indent request (User selects FLA)
@@ -319,6 +307,109 @@ public class IndentRequestController {
 
         return ResponseEntity.ok(indent);
     }
+
+
+
+
+    // IndentController.java
+    @GetMapping("/fla/pending")
+    public ResponseEntity<?> getPendingIndentsForFLA(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new AccessDeniedException("Not authenticated");
+        }
+
+        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+        String username = userDetails.getUsername();
+
+        User flaUser = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("FLA user not found"));
+
+        List<IndentRequest> pendingIndents = indentRequestRepository
+                .findByFlaAndStatus(flaUser, IndentStatus.PENDING_FLA);
+
+        return ResponseEntity.ok(pendingIndents);
+    }
+
+
+    // IndentController.java
+    @PostMapping("/fla/approve")
+    public ResponseEntity<?> approveIndentAsFLA(@RequestBody Map<String, Object> request,
+                                                Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new AccessDeniedException("Not authenticated");
+        }
+
+        Long indentId = Long.valueOf(request.get("indentId").toString());
+        String remark = (String) request.get("remark");
+        Long slaId = Long.valueOf(request.get("slaId").toString());
+
+        IndentRequest indent = indentRequestRepository.findById(indentId)
+                .orElseThrow(() -> new RuntimeException("Indent not found"));
+
+        if (indent.getStatus() != IndentStatus.PENDING_FLA) {
+            return ResponseEntity.badRequest().body("Indent not in FLA stage");
+        }
+
+        // update status, remark, sla, etc.
+        indent.setRemarkByFla(remark);
+        indent.setSla(userRepository.findById(slaId).orElseThrow(() -> new RuntimeException("SLA not found")));
+        indent.setStatus(IndentStatus.PENDING_SLA);
+        indent.setFlaApprovalDate(LocalDateTime.now());
+
+        indentRequestRepository.save(indent);
+
+        return ResponseEntity.ok(Map.of("message", "Approved and forwarded to SLA"));
+    }
+
+    // IndentController.java
+    @GetMapping("/sla/pending")
+    public ResponseEntity<?> getPendingIndentsForSLA(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new AccessDeniedException("Not authenticated");
+        }
+
+        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+        String username = userDetails.getUsername();
+
+        User slaUser = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("SLA user not found"));
+
+        List<IndentRequest> pendingIndents = indentRequestRepository
+                .findBySlaAndStatus(slaUser, IndentStatus.PENDING_SLA);
+
+        return ResponseEntity.ok(pendingIndents);
+    }
+
+
+    // IndentController.java
+    @PostMapping("/sla/approve")
+    public ResponseEntity<?> approveIndentAsSLA(@RequestBody Map<String, Object> request,
+                                                Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new AccessDeniedException("Not authenticated");
+        }
+
+        Long indentId = Long.valueOf(request.get("indentId").toString());
+        String remark = (String) request.get("remark");
+
+        IndentRequest indent = indentRequestRepository.findById(indentId)
+                .orElseThrow(() -> new RuntimeException("Indent not found"));
+
+        if (indent.getStatus() != IndentStatus.PENDING_SLA) {
+            return ResponseEntity.badRequest().body("Indent not in SLA stage");
+        }
+
+        indent.setRemarkBySla(remark);
+        indent.setStatus(IndentStatus.PENDING_STORE);
+        indent.setSlaApprovalDate(LocalDateTime.now());
+
+        indentRequestRepository.save(indent);
+
+        return ResponseEntity.ok(Map.of("message", "Approved and forwarded to Store"));
+    }
+
+
+
 
 
 

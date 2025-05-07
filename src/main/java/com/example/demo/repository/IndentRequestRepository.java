@@ -6,6 +6,7 @@ package com.example.demo.repository;
 //import com.indentmanagement.model.IndentStatus;
 import com.example.demo.model.IndentRequest;
 import com.example.demo.model.IndentStatus;
+import com.example.demo.model.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -22,5 +23,9 @@ public interface IndentRequestRepository extends JpaRepository<IndentRequest, Lo
     List<IndentRequest> findByRequestedById(Long userId);
     List<IndentRequest> findByFlaId(Long flaId);
     List<IndentRequest> findBySlaId(Long slaId);
+    List<IndentRequest> findByFlaAndStatus(User fla, IndentStatus status);
+    List<IndentRequest> findBySlaAndStatus(User sla, IndentStatus status);
+
+
 }
 
