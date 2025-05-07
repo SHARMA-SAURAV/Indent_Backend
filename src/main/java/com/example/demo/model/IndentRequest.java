@@ -52,6 +52,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
@@ -69,12 +70,15 @@ public class IndentRequest {
     private String description;
     private Long perPieceCost; // Cost per piece
     @Enumerated(EnumType.STRING)
+    @Column(length = 50)
     private IndentStatus status = IndentStatus.PENDING_FLA; // Default status
 
     @ManyToOne
     @JoinColumn(name = "requested_by_id", nullable = false)
     private User requestedBy; // User who created the indent
 
+    private String remarkByFinance;
+    private LocalDateTime financeApprovalDate;
     @ManyToOne
     @JoinColumn(name = "fla_id")
     private User fla; // Assigned FLA
@@ -84,7 +88,24 @@ public class IndentRequest {
     private User sla; // Assigned SLA
 
     @OneToMany(mappedBy = "indentRequest", cascade = CascadeType.ALL)
-    private List<IndentRemark> remarks;
+    private List<Remark> remarks=new ArrayList<>();
+
+    public void addRemark(String role, String message) {
+        this.remarks.add(new Remark(role, message, this));
+    }
+
+    private String remarkByStore;
+    private LocalDateTime storeApprovalDate;
+
+    @ManyToOne
+    @JoinColumn(name = "store_id")
+    private User store;
+
+
+    @ManyToOne
+    @JoinColumn(name = "assigned_to_id")
+    private User assignedTo; // Currently responsible user (e.g., store/finance/purchase)
+
 
     private Date createdAt = new Date();
     private LocalDateTime flaApprovalDate;

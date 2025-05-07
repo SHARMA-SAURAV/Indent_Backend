@@ -8,6 +8,9 @@ public enum IndentStatus {
     STORE_REVIEW,   // Store reviewed, sent to Finance
     FINANCE_REVIEW, // Finance reviewed, sent to Purchase
     PURCHASE_REVIEW,// Purchase reviewed, indent completed
-    COMPLETED,      // Fully approved and processed
+    COMPLETED,
+    FORWARDED_TO_STORE,
+    PENDING_FINANCE,
+    PENDING_PURCHASE,
     PENDING_STORE, PENDING_FLA, REJECTED        // Rejected at any stage
 }

@@ -14,7 +14,7 @@ import org.springframework.data.repository.query.Param;
 import java.util.List;
 
 public interface IndentRequestRepository extends JpaRepository<IndentRequest, Long> {
-    List<IndentRequest> findByStatus(IndentStatus status);
+   public  List<IndentRequest> findByStatus(IndentStatus status);
     // IndentRepository.java
 
         // Use JOIN FETCH to avoid LazyInitializationException
@@ -25,7 +25,13 @@ public interface IndentRequestRepository extends JpaRepository<IndentRequest, Lo
     List<IndentRequest> findBySlaId(Long slaId);
     List<IndentRequest> findByFlaAndStatus(User fla, IndentStatus status);
     List<IndentRequest> findBySlaAndStatus(User sla, IndentStatus status);
+    // IndentRequestRepository.java
+//    public List<IndentRequest> findByStatus(IndentStatus status);
 
+    List<IndentRequest> findByStatusAndAssignedToId(IndentStatus status, Long userId);
+    List<IndentRequest> findByStatusAndStore_Id(IndentStatus status, Long storeId);
+//    List<IndentRequest> findByStatusAndStore_Id(IndentStatus status, Long storeId);
+//
 
 }
 

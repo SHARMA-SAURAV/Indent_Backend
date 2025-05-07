@@ -27,6 +27,9 @@ public class UserDetailsImpl implements UserDetails {
         this.user = user;
     }
 
+    public Long getId() {
+        return (long) user.getId();
+    }
 //    public UserDetailsImpl(com.example.demo.model.User user) {
 //    }
 
@@ -66,4 +69,7 @@ public class UserDetailsImpl implements UserDetails {
     public boolean isEnabled() {
         return true;
     }
+
+
+
 }
