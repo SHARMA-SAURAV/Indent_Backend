@@ -28,20 +28,13 @@ public class User {
     private String employeeId;
     private String sex;
 
-
-//    public Set<RoleType> getRoles() {
-//        return roles;
-//    }
-//
-//    public void setRoles(Set<RoleType> roles) {
-//        this.roles = roles;
-//    }
-
     @ElementCollection(fetch = FetchType.EAGER)
     @Enumerated(EnumType.STRING)
     private Set<RoleType> roles = new HashSet<>();
 
 
-
+    public String getFullName() {
+        return name;
+    }
 
 }

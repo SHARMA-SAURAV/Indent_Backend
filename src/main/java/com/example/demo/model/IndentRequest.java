@@ -1,52 +1,7 @@
-//package com.example.demo.model;
-//
-////package com.indentmanagement.model;
-//
-//import jakarta.persistence.*;
-//import lombok.Getter;
-//import lombok.Setter;
-//
-//import java.util.Date;
-//import java.util.List;
-//
-//@Entity
-//@Getter
-//@Setter
-//public class IndentRequest {
-//
-//    @Id
-//    @GeneratedValue(strategy = GenerationType.IDENTITY)
-//    private Long id;
-//
-//    private String itemName;
-//    private int quantity;
-//    private String description;
-//
-//    @Enumerated(EnumType.STRING)
-//    private IndentStatus status = IndentStatus.PENDING;  // Default status
-//
-//    @ManyToOne
-//    @JoinColumn(name = "requested_by")
-//    private User requestedBy;
-//
-//    @ManyToOne
-//    @JoinColumn(name = "fla_id")
-//    private User fla;
-//
-//    @ManyToOne
-//    @JoinColumn(name = "sla_id")
-//    private User sla;
-//
-//    @OneToMany(mappedBy = "indentRequest", cascade = CascadeType.ALL)
-//    private List<IndentRemark> remarks;
-//
-//    private Date createdAt = new Date();
-//}
-//
-
 
 package com.example.demo.model;
 
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -65,10 +20,23 @@ public class IndentRequest {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    private String projectName;
     private String itemName;
     private int quantity;
     private String description;
-    private Long perPieceCost; // Cost per piece
+    private Long perPieceCost;
+    private double totalCost;
+    private String purpose;
+    private String department;
+
+
+    @Column(name = "specification_model_details", columnDefinition = "TEXT")
+    private String specificationModelDetails;
+
+    //    private String itemName;
+//    private int quantity;
+//    private String description;
+//    private Long perPieceCost; // Cost per piece
     @Enumerated(EnumType.STRING)
     @Column(length = 50)
     private IndentStatus status = IndentStatus.PENDING_FLA; // Default status
@@ -79,8 +47,41 @@ public class IndentRequest {
 
     private String remarkByFinance;
     private LocalDateTime financeApprovalDate;
-    private String setRemarkByPurchase;
-    private LocalDateTime setPurchaseCompletionDate;
+    private String remarkByPurchase;
+    private LocalDateTime purchaseCompletionDate;
+    private LocalDateTime gfrGeneratedDate;
+    private String financeRemark;
+    private LocalDateTime paymentCompletedDate;
+    private LocalDateTime userInspectionDate;
+    private String gfrNote;
+    private String paymentNote;
+    private LocalDateTime gfrCreatedAt;
+    private LocalDateTime paymentCreatedAt;
+    @ManyToOne
+    @JoinColumn(name = "user_id")
+    private User requester;
+
+
+    @OneToMany(mappedBy = "indentRequest", cascade = CascadeType.ALL)
+    @JsonManagedReference
+    private List<Remark> remarks = new ArrayList<>();
+
+    private String remarkByUser;
+
+
+
+
+
+    //    private LocalDateTime userInspectionDate;
+    private String userInspectionRemark;
+
+//    private LocalDateTime gfrGeneratedDate;
+    private String gfrDetails;
+
+    private LocalDateTime paymentDate;
+    private String paymentRemark;
+
+
     @ManyToOne
     @JoinColumn(name = "fla_id")
     private User fla; // Assigned FLA
@@ -89,8 +90,8 @@ public class IndentRequest {
     @JoinColumn(name = "sla_id")
     private User sla; // Assigned SLA
 
-    @OneToMany(mappedBy = "indentRequest", cascade = CascadeType.ALL)
-    private List<Remark> remarks=new ArrayList<>();
+//    @OneToMany(mappedBy = "indentRequest", cascade = CascadeType.ALL)
+//    private List<Remark> remarks=new ArrayList<>();
 
     public void addRemark(String role, String message) {
         this.remarks.add(new Remark(role, message, this));
@@ -116,4 +117,5 @@ public class IndentRequest {
     private LocalDateTime slaApprovalDate;
 
     private Date updatedAt ; // To track the last update time
+
 }

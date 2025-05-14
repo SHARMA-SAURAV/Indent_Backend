@@ -70,6 +70,17 @@ public class UserDetailsImpl implements UserDetails {
         return true;
     }
 
+// add entiry which return user in this
+    // create the method to return the User object
+    public User getUser() {
+        return user;
+    }
+
+    // This method is not part of UserDetails interface
 
 
+
+//    public User getUser() {
+//        return null;
+//    }
 }

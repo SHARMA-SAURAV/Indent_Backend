@@ -63,6 +63,26 @@ public class AuthController {
 
     }
 
+    // make a endpoint for logout
+    @PostMapping("/logout")
+    public ResponseEntity<?> logoutUser() {
+        // Invalidate the JWT token or perform any other logout logic
+        // For example, you can remove the token from the client-side storage
+        // or mark it as invalid in your database
+        // Here, we are just returning a success message
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null) {
+            // Invalidate the authentication
+            SecurityContextHolder.clearContext();
+        }
+        // Optionally, you can also invalidate the JWT token on the server-side
+        // by storing it in a blacklist or marking it as expired
+
+        return ResponseEntity.ok("User logged out successfully");
+    }
+
+
+
     @PostMapping("/login")
     public ResponseEntity<?> loginUser(@RequestBody Map<String, String> request) {
         String username = request.get("username");

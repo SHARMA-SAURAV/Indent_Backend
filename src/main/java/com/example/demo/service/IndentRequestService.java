@@ -117,17 +117,24 @@ public class IndentRequestService {
     private EmailService emailService;
 
     // Create an indent request
-    public IndentRequest createIndentRequest(Long userId, String itemName, int quantity,Long perPieceCost, String description, Long flaId) {
+    public IndentRequest createIndentRequest(Long userId, String itemName, int quantity,Long perPieceCost, String description, Long flaId,String projectName, Double totalCost, String purpose,
+                                             String department,
+                                             String specificationModelDetails) {
         User user = userRepository.findById(userId).orElseThrow(()-> new RuntimeException("User not found")) ;
         User fla = userRepository.findById(flaId).orElseThrow(()-> new RuntimeException("FLA not found")) ;
 
         IndentRequest indentRequest = new IndentRequest();
         indentRequest.setRequestedBy(user);
+        indentRequest.setProjectName(projectName);
         indentRequest.setItemName(itemName);
         indentRequest.setQuantity(quantity);
         indentRequest.setPerPieceCost(perPieceCost);
         indentRequest.setDescription(description);
+        indentRequest.setTotalCost(totalCost);
         indentRequest.setFla(fla);
+        indentRequest.setPurpose(purpose);
+        indentRequest.setDepartment(department);
+        indentRequest.setSpecificationModelDetails(specificationModelDetails);
         indentRequest.setStatus(IndentStatus.PENDING_FLA);
         indentRequest.setCreatedAt(new Date());
 

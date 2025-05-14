@@ -30,6 +30,11 @@ public interface IndentRequestRepository extends JpaRepository<IndentRequest, Lo
 
     List<IndentRequest> findByStatusAndAssignedToId(IndentStatus status, Long userId);
     List<IndentRequest> findByStatusAndStore_Id(IndentStatus status, Long storeId);
+    List<IndentRequest> findByRequestedByIdAndStatus(Long userId, IndentStatus status);
+//    List<IndentRequest> findByUser(User user);
+//    List<IndentRequest> findByRequester(User user);
+    List<IndentRequest> findByRequestedBy(User user);
+
 //    List<IndentRequest> findByStatusAndStore_Id(IndentStatus status, Long storeId);
 //
 

@@ -76,6 +76,12 @@ public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Excepti
                     .requestMatchers("/api/indent/store/pending").authenticated() //  No path variable
                     .requestMatchers("/api/indent/finance/approve").authenticated() //  No path variable
                     .requestMatchers("/api/indent/finance/pending").authenticated() //  No path variable
+                    .requestMatchers("/api/indent/purchase/pending").authenticated()
+                    .requestMatchers("/api/indent/purchase/complete").authenticated()
+                    .requestMatchers("/api/indent/user/inspect").hasRole("USER")
+                    .requestMatchers("/api/indent/purchase/generate-gfr").hasRole("PURCHASE")
+                    .requestMatchers("/api/indent/finance/pay").hasRole("FINANCE")
+                    .requestMatchers("/api/indent/user/all").hasRole("USER")
 
 
                     .requestMatchers("/api/indent/{indentId}/assign-sla/{slaId}").hasRole("FLA")

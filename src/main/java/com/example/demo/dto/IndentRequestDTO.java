@@ -5,6 +5,10 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.time.LocalDateTime;
+import java.util.Date;
+import java.util.List;
+
 @Data
 @NoArgsConstructor
 @Getter
@@ -18,7 +22,46 @@ public class IndentRequestDTO {
     private String flaUsername;  // Username of the FLA
     private String remarkBySla;  // Remark added by SLA
     private String status;
+    private String requestedByName;
 
+    private String flaName;
+    private String slaName;
+    private String storeName;
+    private String remarkByFinance;
+    private LocalDateTime financeApprovalDate;
+    private String remarkByPurchase;
+    private LocalDateTime purchaseCompletionDate;
+
+    private LocalDateTime gfrGeneratedDate;
+    private String gfrNote;
+    private String gfrDetails;
+
+    private String financeRemark;
+    private LocalDateTime paymentCompletedDate;
+    private String paymentNote;
+    private LocalDateTime paymentCreatedAt;
+
+    private LocalDateTime userInspectionDate;
+    private String userInspectionRemark;
+
+    private String remarkByStore;
+    private LocalDateTime storeApprovalDate;
+
+    private double totalCost;
+    private String purpose;
+    private String department;
+    private String specificationModelDetails;
+    private String projectName;
+    private LocalDateTime flaApprovalDate;
+    private String remarkByFla;
+    private LocalDateTime slaApprovalDate;
+//    private String remarkBySla;
+
+    private Date createdAt;
+//    private String flaUsername; // <-- Add this
+    private Date updatedAt;
+
+    private List<RemarkDTO> remarks;
     // Constructor
     public IndentRequestDTO(Long id, String itemName, int quantity, Long perPieceCost, String description,
                             String flaUsername, String remarkBySla, String status) {
@@ -31,15 +74,5 @@ public class IndentRequestDTO {
         this.remarkBySla = remarkBySla;
         this.status = status;
     }
-
-//    // Getters and setters
-//    public Long getId() { return id; }
-//    public String getItemName() { return itemName; }
-//    public int getQuantity() { return quantity; }
-//    public Long getPerPieceCost() { return perPieceCost; }
-//    public String getDescription() { return description; }
-//    public String getFlaUsername() { return flaUsername; }
-//    public String getRemarkBySla() { return remarkBySla; }
-//    public String getStatus() { return status; }
 }
 
