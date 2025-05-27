@@ -1,91 +1,3 @@
-//package com.example.demo.service;
-//
-////package com.indentmanagement.service;
-//
-////import com.indentmanagement.model.*;
-////import com.indentmanagement.repository.IndentRemarkRepository;
-////import com.indentmanagement.repository.IndentRequestRepository;
-////import com.indentmanagement.repository.UserRepository;
-//import com.example.demo.model.IndentRemark;
-//import com.example.demo.model.IndentRequest;
-//import com.example.demo.model.IndentStatus;
-//import com.example.demo.model.User;
-//import com.example.demo.repository.IndentRemarkRepository;
-//import com.example.demo.repository.IndentRequestRepository;
-//import com.example.demo.repository.UserRepository;
-//import org.springframework.stereotype.Service;
-//import java.util.List;
-//import java.util.Optional;
-//
-//@Service
-//public class IndentRequestService {
-//
-//    private final IndentRequestRepository indentRequestRepository;
-//    private final UserRepository userRepository;
-//    private final IndentRemarkRepository indentRemarkRepository;
-//
-//    public IndentRequestService(IndentRequestRepository indentRequestRepository,
-//                                UserRepository userRepository, IndentRemarkRepository indentRemarkRepository) {
-//        this.indentRequestRepository = indentRequestRepository;
-//        this.userRepository = userRepository;
-//        this.indentRemarkRepository = indentRemarkRepository;
-//    }
-//
-//    // User creates a new indent request
-//    public IndentRequest createIndentRequest(Long userId, String itemName, int quantity, String description, Long flaId) {
-//        Optional<User> user = userRepository.findById(userId);
-//        Optional<User> fla = userRepository.findById(flaId);
-//
-//        if (user.isEmpty() || fla.isEmpty()) {
-//            throw new RuntimeException("User or FLA not found!");
-//        }
-//
-//        IndentRequest indent = new IndentRequest();
-//        indent.setRequestedBy(user.get());
-//        indent.setItemName(itemName);
-//        indent.setQuantity(quantity);
-//        indent.setDescription(description);
-//        indent.setFla(fla.get());
-//        indent.setStatus(IndentStatus.PENDING);
-//
-//        return indentRequestRepository.save(indent);
-//    }
-//
-//    // FLA assigns an SLA
-//    public IndentRequest assignSLA(Long indentId, Long slaId) {
-//        IndentRequest indent = indentRequestRepository.findById(indentId)
-//                .orElseThrow(() -> new RuntimeException("Indent not found"));
-//
-//        User sla = userRepository.findById(slaId)
-//                .orElseThrow(() -> new RuntimeException("SLA not found"));
-//
-//        indent.setSla(sla);
-//        indent.setStatus(IndentStatus.FLA_APPROVED);
-//
-//        return indentRequestRepository.save(indent);
-//    }
-//
-//    // Store, Finance, or Purchase roles add remarks
-//    public IndentRemark addRemark(Long indentId, Long userId, String remark) {
-//        IndentRequest indent = indentRequestRepository.findById(indentId)
-//                .orElseThrow(() -> new RuntimeException("Indent not found"));
-//
-//        User user = userRepository.findById(userId)
-//                .orElseThrow(() -> new RuntimeException("User not found"));
-//
-//        IndentRemark indentRemark = new IndentRemark();
-//        indentRemark.setIndentRequest(indent);
-//        indentRemark.setUser(user);
-//        indentRemark.setRemark(remark);
-//
-//        return indentRemarkRepository.save(indentRemark);
-//    }
-//}
-
-
-
-
-
 
 
 package com.example.demo.service;
@@ -116,123 +28,52 @@ public class IndentRequestService {
     @Autowired
     private EmailService emailService;
 
-    // Create an indent request
-    public IndentRequest createIndentRequest(Long userId, String itemName, int quantity,Long perPieceCost, String description, Long flaId,String projectName, Double totalCost, String purpose,
-                                             String department,
-                                             String specificationModelDetails) {
-        User user = userRepository.findById(userId).orElseThrow(()-> new RuntimeException("User not found")) ;
-        User fla = userRepository.findById(flaId).orElseThrow(()-> new RuntimeException("FLA not found")) ;
 
-        IndentRequest indentRequest = new IndentRequest();
-        indentRequest.setRequestedBy(user);
-        indentRequest.setProjectName(projectName);
-        indentRequest.setItemName(itemName);
-        indentRequest.setQuantity(quantity);
-        indentRequest.setPerPieceCost(perPieceCost);
-        indentRequest.setDescription(description);
-        indentRequest.setTotalCost(totalCost);
-        indentRequest.setFla(fla);
-        indentRequest.setPurpose(purpose);
-        indentRequest.setDepartment(department);
-        indentRequest.setSpecificationModelDetails(specificationModelDetails);
+
+
+
+public IndentRequest createIndentRequest(Long userId, String itemName, int quantity, Long perPieceCost,
+                                         String description, String recipientType, Long recipientId,
+                                         String projectName, Double totalCost, String purpose,
+                                         String department, String specificationModelDetails) {
+    User user = userRepository.findById(userId).orElseThrow(() -> new RuntimeException("User not found"));
+    User recipient = userRepository.findById(recipientId)
+            .orElseThrow(() -> new RuntimeException(recipientType + " not found"));
+
+    IndentRequest indentRequest = new IndentRequest();
+    indentRequest.setRequestedBy(user);
+    indentRequest.setItemName(itemName);
+    indentRequest.setQuantity(quantity);
+    indentRequest.setPerPieceCost(perPieceCost);
+    indentRequest.setDescription(description);
+    indentRequest.setProjectName(projectName);
+    indentRequest.setTotalCost(totalCost);
+    indentRequest.setPurpose(purpose);
+    indentRequest.setDepartment(department);
+    indentRequest.setSpecificationModelDetails(specificationModelDetails);
+    indentRequest.setCreatedAt(new Date());
+//    indentRequest.setStatus(IndentStatus.PENDING_FLA);
+
+
+    if (recipientType.equalsIgnoreCase("FLA")) {
+        indentRequest.setFla(recipient);
         indentRequest.setStatus(IndentStatus.PENDING_FLA);
-        indentRequest.setCreatedAt(new Date());
-
-        IndentRequest savedIndent = indentRequestRepository.save(indentRequest);
-
-        // Notify FLA
-        emailService.sendEmail(fla.getEmail(), "Indent Approval Request",
-                "An indent has been assigned to you for approval.");
-
-        return savedIndent;
+    } else {
+        indentRequest.setSla(recipient);
+        indentRequest.setStatus(IndentStatus.PENDING_SLA);
     }
 
-    //Approved by FLA
-    public IndentRequest approveByFLA(Long indentId, Long slaId, String remark) {
-        IndentRequest indent = indentRequestRepository.findById(indentId)
-                .orElseThrow(() -> new RuntimeException("Indent not found"));
+    // Save and notify
+    IndentRequest savedIndent = indentRequestRepository.save(indentRequest);
 
-        User sla = userRepository.findById(slaId)
-                .orElseThrow(() -> new RuntimeException("SLA not found"));
+    emailService.sendEmail(
+            recipient.getEmail(),
+            "Indent Approval Request",
+            "An indent has been assigned to you for approval."
+    );
 
-        indent.setSla(sla);
-        indent.setStatus(IndentStatus.FLA_APPROVED);
-
-        // Optionally add a remark
-        if (remark != null && !remark.isEmpty()) {
-            addRemark(indentId, slaId, remark);
-        }
-        emailService.sendEmail(sla.getEmail(), "Indent Assigned to You",
-                "You have been selected as SLA for Indent #" + indent.getId());
-        return indentRequestRepository.save(indent);
-    }
-
-
-    // Approve by SLA
-    public IndentRequest approveBySLA(Long indentId, String remark) {
-        IndentRequest indent = indentRequestRepository.findById(indentId)
-                .orElseThrow(() -> new RuntimeException("Indent not found"));
-
-        indent.setStatus(IndentStatus.SLA_APPROVED);
-
-        // Optionally add a remark
-        if (remark != null && !remark.isEmpty()) {
-            addRemark(indentId, (long) indent.getSla().getId(), remark);
-        }
-
-        return indentRequestRepository.save(indent);
-    }
-
-    // Approve by Store
-    public IndentRequest approveByStore(Long indentId, String remark) {
-        IndentRequest indent = indentRequestRepository.findById(indentId)
-                .orElseThrow(() -> new RuntimeException("Indent not found"));
-
-        indent.setStatus(IndentStatus.FINANCE_REVIEW);
-
-        // Optionally add a remark
-        if (remark != null && !remark.isEmpty()) {
-            addRemark(indentId, (long) indent.getSla().getId(), remark);
-        }
-
-        return indentRequestRepository.save(indent);
-    }
-
-    // Approve by Finance
-    public IndentRequest approveByFinance(Long indentId, String remark) {
-        IndentRequest indent = indentRequestRepository.findById(indentId)
-                .orElseThrow(() -> new RuntimeException("Indent not found"));
-
-        indent.setStatus(IndentStatus.PURCHASE_REVIEW);
-
-        // Optionally add a remark
-        if (remark != null && !remark.isEmpty()) {
-            addRemark(indentId, (long) indent.getSla().getId(), remark);
-        }
-
-        return indentRequestRepository.save(indent);
-    }
-
-    // Approve by Purchase
-    public IndentRequest approveByPurchase(Long indentId, String remark) {
-        IndentRequest indent = indentRequestRepository.findById(indentId)
-                .orElseThrow(() -> new RuntimeException("Indent not found"));
-
-        indent.setStatus(IndentStatus.COMPLETED);
-
-        // Optionally add a remark
-        if (remark != null && !remark.isEmpty()) {
-            addRemark(indentId, (long) indent.getSla().getId(), remark);
-        }
-
-        return indentRequestRepository.save(indent);
-    }
-
-
-
-
-
-
+    return savedIndent;
+}
 
     // FLA approves and assigns SLA
     public IndentRequest assignSLA(Long indentId, Long slaId) {
@@ -280,18 +121,18 @@ public class IndentRequestService {
     }
 
     // Add a remark
-    public IndentRemark addRemark(Long indentId, Long userId, String remarkText) {
-        IndentRequest indent = indentRequestRepository.findById(indentId).orElseThrow();
-        User user = userRepository.findById(userId).orElseThrow();
-
-        IndentRemark remark = new IndentRemark();
-        remark.setIndentRequest(indent);
-        remark.setUser(user);
-        remark.setRemark(remarkText);
-        remark.setCreatedAt(new Date());
-
-        return indentRemarkRepository.save(remark);
-    }
+//    public IndentRemark addRemark(Long indentId, Long userId, String remarkText) {
+//        IndentRequest indent = indentRequestRepository.findById(indentId).orElseThrow();
+//        User user = userRepository.findById(userId).orElseThrow();
+//
+//        IndentRemark remark = new IndentRemark();
+//        remark.setIndentRequest(indent);
+//        remark.setUser(user);
+//        remark.setRemark(remarkText);
+//        remark.setCreatedAt(new Date());
+//
+//        return indentRemarkRepository.save(remark);
+//    }
 
     public List<IndentRequest> getIndentsByUserId(Long userId) {
         if (!userRepository.existsById(userId)) {

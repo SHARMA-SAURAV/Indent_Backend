@@ -34,6 +34,18 @@ public interface IndentRequestRepository extends JpaRepository<IndentRequest, Lo
 //    List<IndentRequest> findByUser(User user);
 //    List<IndentRequest> findByRequester(User user);
     List<IndentRequest> findByRequestedBy(User user);
+    @Query("SELECT ir FROM IndentRequest ir " +
+            "LEFT JOIN FETCH ir.fla " +
+            "LEFT JOIN FETCH ir.sla " +
+            "WHERE ir.status = :status")
+    List<IndentRequest> findByStatusWithUsers(@Param("status") IndentStatus status);
+
+
+    @Query("SELECT ir FROM IndentRequest ir JOIN FETCH ir.requestedBy")
+    List<IndentRequest> findAllWithUser();
+
+
+
 
 //    List<IndentRequest> findByStatusAndStore_Id(IndentStatus status, Long storeId);
 //

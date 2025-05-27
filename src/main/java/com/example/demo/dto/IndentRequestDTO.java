@@ -23,7 +23,6 @@ public class IndentRequestDTO {
     private String remarkBySla;  // Remark added by SLA
     private String status;
     private String requestedByName;
-
     private String flaName;
     private String slaName;
     private String storeName;
@@ -60,17 +59,20 @@ public class IndentRequestDTO {
     private Date createdAt;
 //    private String flaUsername; // <-- Add this
     private Date updatedAt;
+    private String slaUsername;
 
     private List<RemarkDTO> remarks;
     // Constructor
     public IndentRequestDTO(Long id, String itemName, int quantity, Long perPieceCost, String description,
-                            String flaUsername, String remarkBySla, String status) {
+                            String flaUsername , String slaUsername, String remarkBySla, String status) {
         this.id = id;
         this.itemName = itemName;
         this.quantity = quantity;
         this.perPieceCost = perPieceCost;
         this.description = description;
-        this.flaUsername = flaUsername;
+        // use conditional operator for chekcing the flausername is null or not
+        this.slaUsername=slaUsername!=null? slaUsername: null;
+        this.flaUsername = flaUsername!=null? flaUsername: null;
         this.remarkBySla = remarkBySla;
         this.status = status;
     }

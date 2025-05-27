@@ -33,6 +33,7 @@
 
 package com.example.demo.model;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -49,11 +50,12 @@ public class IndentRemark {
 
     @ManyToOne
     @JoinColumn(name = "indent_request_id")
+    @JsonBackReference
     private IndentRequest indentRequest;
 
-    @ManyToOne
-    @JoinColumn(name = "user_id")
-    private User user;
+//    @ManyToOne
+//    @JoinColumn(name = "user_id")
+//    private User user;
 
     private String remark;
     private Date createdAt = new Date();

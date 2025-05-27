@@ -66,7 +66,7 @@ public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Excepti
             .authorizeHttpRequests(auth -> auth
                     .requestMatchers("/api/auth/**").permitAll()
                     .requestMatchers("/api/auth/users/by-role").permitAll() // ✅ Correct pattern
-                    .requestMatchers("/api/indent/create").permitAll()
+                    .requestMatchers("/api/indent/create").authenticated()
                     .requestMatchers("/api/auth/me").authenticated()
                     .requestMatchers("/api/indent/fla/pending").authenticated() //  No path variable
                     .requestMatchers("/api/indent/fla/approve").authenticated() // No path variable
