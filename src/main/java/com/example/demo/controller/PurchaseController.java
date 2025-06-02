@@ -55,6 +55,7 @@ public class PurchaseController {
 //        review.setReviewedAt(LocalDateTime.now());
         review.setReviewDate(LocalDateTime.now());
         purchaseReviewRepository.save(review);
+
         return ResponseEntity.ok(Map.of("message", "Review added successfully"));
     }
 
@@ -169,4 +170,22 @@ public class PurchaseController {
                 "inwardEntryGenerated", inwardEntryGenerated
         ));
     }
+
+    @GetMapping("/tracking")
+    public ResponseEntity<?> getPurchaseTrackingIndents(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new AccessDeniedException("Not authenticated");
+        }
+
+        // Fetch all indents with associated users (requestedBy, FLA, SLA, etc.)
+        List<IndentRequest> allIndents = indentRequestRepository.findAllWithUser();
+
+        // Filter indents that are relevant for Purchase (status at or after PENDING_PURCHASE)
+        List<IndentRequest> purchaseRelevant = allIndents.stream()
+                .filter(indent -> indent.getStatus().ordinal() >= IndentStatus.PENDING_PURCHASE.ordinal())
+                .toList();
+
+        return ResponseEntity.ok(purchaseRelevant);
+    }
+
 }

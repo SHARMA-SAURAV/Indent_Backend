@@ -15,12 +15,14 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @RestController
@@ -64,6 +66,152 @@ public class IndentRequestController {
     }
 
 
+//    @PreAuthorize("hasRole('USER')")
+//    @PostMapping("/create")
+//    public ResponseEntity<?> createIndent(@Valid @RequestBody Map<String, Object> request,
+//                                          Authentication authentication) {
+//        if (authentication == null || !authentication.isAuthenticated()) {
+//            throw new AccessDeniedException("User not authenticated");
+//        }
+//
+//        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+//        User user = userRepository.findByUsername(userDetails.getUsername())
+//                .orElseThrow(() -> new RuntimeException("User not found"));
+//
+//        String recipientType =(String) request.get("recipientType");
+//        Long recipientId=Long.valueOf(request.get("recipientId").toString());
+//        String projectName = (String) request.get("projectName");
+//        System.err.println("Project Name: " + projectName);
+//        String itemName = (String) request.get("itemName");
+////        print itemname
+//        System.err.println("Item Name: " + itemName);
+//        int quantity = (int) request.get("quantity");
+//        //print quantity
+//        System.err.println("Quantity: " + quantity);
+//        Long perPieceCost = Long.valueOf((request.get("perPieceCost").toString()));
+//        //print perPieceCost
+//        System.err.println("Per Piece Cost: " + perPieceCost);
+//        String description = (String) request.get("description");
+//        //print description
+//        System.err.println("Description: " + description);
+//        Double totalCost = Double.valueOf(request.get("totalCost").toString());
+//        String purpose = (String) request.get("purpose");
+//        String department = (String) request.get("department");
+//        String specificationModelDetails = (String) request.get("specificationModelDetails");
+//
+//        IndentRequest indent = indentRequestService.createIndentRequest(
+//                (long) user.getId(), itemName, quantity, perPieceCost, description,
+//                recipientType, recipientId, projectName, totalCost, purpose,
+//                department, specificationModelDetails);
+//
+//        return ResponseEntity.ok(indent);
+//    }
+
+
+
+
+@PreAuthorize("hasRole('USER')")
+@PostMapping("/create-multiple")
+public ResponseEntity<?> createMultipleIndents(@Valid @RequestBody Map<String, Object> request,
+                                               Authentication authentication) {
+    if (authentication == null || !authentication.isAuthenticated()) {
+        throw new AccessDeniedException("User not authenticated");
+    }
+
+    UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+    User user = userRepository.findByUsername(userDetails.getUsername())
+            .orElseThrow(() -> new RuntimeException("User not found"));
+
+    try {
+        // Extract common fields
+        String recipientType = (String) request.get("recipientType");
+        Long recipientId = Long.valueOf(request.get("recipientId").toString());
+        String projectName = (String) request.get("projectName");
+        String purpose = (String) request.get("purpose");
+        String department = (String) request.get("department");
+
+        // Extract items array
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> itemsList = (List<Map<String, Object>>) request.get("items");
+
+        if (itemsList == null || itemsList.isEmpty()) {
+            return ResponseEntity.badRequest().body("At least one item is required");
+        }
+
+        List<IndentRequest> createdIndents = new ArrayList<>();
+
+        // Process each item and create separate indent requests
+        for (Map<String, Object> itemData : itemsList) {
+            String itemName = (String) itemData.get("itemName");
+            String category = (String) itemData.get("category");
+            int quantity = (int) itemData.get("quantity");
+            Long perPieceCost = Long.valueOf(itemData.get("perPieceCost").toString());
+            String description = (String) itemData.get("description");
+            String specificationModelDetails = (String) itemData.get("specificationModelDetails");
+            Double totalCost = Double.valueOf(itemData.get("totalCost").toString());
+
+            // Handle file upload information
+            String fileName = (String) itemData.get("fileName");
+            String fileUrl = (String) itemData.get("fileUrl");
+            String fileType = (String) itemData.get("fileType");
+
+            System.err.println("Creating indent for item: " + itemName + ", Category: " + category);
+
+            IndentRequest indent = indentRequestService.createIndentRequestWithCategory(
+                    (long) user.getId(), itemName, category, quantity, perPieceCost,
+                    description, recipientType, recipientId, projectName, totalCost,
+                    purpose, department, specificationModelDetails, fileName, fileUrl, fileType);
+
+            createdIndents.add(indent);
+        }
+
+        // Return response with created indents
+        Map<String, Object> response = new HashMap<>();
+        response.put("message", "Successfully created " + createdIndents.size() + " indent requests");
+        response.put("indents", createdIndents);
+        response.put("totalIndents", createdIndents.size());
+
+        return ResponseEntity.ok(response);
+
+    } catch (Exception e) {
+        System.err.println("Error creating multiple indents: " + e.getMessage());
+        return ResponseEntity.badRequest().body("Error creating indents: " + e.getMessage());
+    }
+}
+
+    @PreAuthorize("hasRole('USER')")
+    @PostMapping("/create-draft")
+    public ResponseEntity<?> createDraftIndents(@Valid @RequestBody Map<String, Object> request,
+                                                Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new AccessDeniedException("User not authenticated");
+        }
+
+        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+        User user = userRepository.findByUsername(userDetails.getUsername())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        try {
+            // Save items as draft (temporary storage)
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> itemsList = (List<Map<String, Object>>) request.get("items");
+
+            // You can store this in a temporary table or cache for later processing
+            // For now, returning the processed data for frontend confirmation
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Draft saved successfully");
+            response.put("itemCount", itemsList.size());
+            response.put("items", itemsList);
+
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Error saving draft: " + e.getMessage());
+        }
+    }
+
+    // Keep the original single indent creation for backward compatibility
     @PreAuthorize("hasRole('USER')")
     @PostMapping("/create")
     public ResponseEntity<?> createIndent(@Valid @RequestBody Map<String, Object> request,
@@ -76,36 +224,113 @@ public class IndentRequestController {
         User user = userRepository.findByUsername(userDetails.getUsername())
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        String recipientType =(String) request.get("recipientType");
-        Long recipientId=Long.valueOf(request.get("recipientId").toString());
-
-
+        String recipientType = (String) request.get("recipientType");
+        Long recipientId = Long.valueOf(request.get("recipientId").toString());
         String projectName = (String) request.get("projectName");
-        System.err.println("Project Name: " + projectName);
         String itemName = (String) request.get("itemName");
-//        print itemname
-        System.err.println("Item Name: " + itemName);
+        String category = (String) request.get("category"); // New field
         int quantity = (int) request.get("quantity");
-        //print quantity
-        System.err.println("Quantity: " + quantity);
         Long perPieceCost = Long.valueOf((request.get("perPieceCost").toString()));
-        //print perPieceCost
-        System.err.println("Per Piece Cost: " + perPieceCost);
         String description = (String) request.get("description");
-        //print description
-        System.err.println("Description: " + description);
         Double totalCost = Double.valueOf(request.get("totalCost").toString());
         String purpose = (String) request.get("purpose");
         String department = (String) request.get("department");
         String specificationModelDetails = (String) request.get("specificationModelDetails");
 
-        IndentRequest indent = indentRequestService.createIndentRequest(
-                (long) user.getId(), itemName, quantity, perPieceCost, description,
+        // File upload fields
+        String fileName = (String) request.get("fileName");
+        String fileUrl = (String) request.get("fileUrl");
+        String fileType = (String) request.get("fileType");
+
+        System.err.println("Project Name: " + projectName);
+        System.err.println("Item Name: " + itemName);
+        System.err.println("Category: " + category);
+        System.err.println("Quantity: " + quantity);
+        System.err.println("Per Piece Cost: " + perPieceCost);
+        System.err.println("Description: " + description);
+        System.err.println("File Name: " + fileName);
+
+        IndentRequest indent = indentRequestService.createIndentRequestWithCategory(
+                (long) user.getId(), itemName, category, quantity, perPieceCost, description,
                 recipientType, recipientId, projectName, totalCost, purpose,
-                department, specificationModelDetails);
+                department, specificationModelDetails, fileName, fileUrl, fileType);
 
         return ResponseEntity.ok(indent);
     }
+
+    @PreAuthorize("hasAnyRole('USER', 'FLA', 'SLA', 'FINANCE', 'PURCHASE', 'STORE')")
+    @GetMapping("/by-category/{category}")
+    public ResponseEntity<?> getIndentsByCategory(@PathVariable String category,
+                                                  Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new AccessDeniedException("User not authenticated");
+        }
+
+        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+        String userRole = userDetails.getAuthorities().iterator().next().getAuthority().replace("ROLE_", "");
+
+        try {
+            List<IndentRequest> indents = indentRequestService.getIndentsByCategory(category, userRole);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("category", category);
+            response.put("userRole", userRole);
+            response.put("indents", indents);
+            response.put("totalCount", indents.size());
+
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Error fetching indents by category: " + e.getMessage());
+        }
+    }
+
+    @PreAuthorize("hasAnyRole('USER', 'FLA', 'SLA', 'FINANCE', 'PURCHASE', 'STORE')")
+    @GetMapping("/categories")
+    public ResponseEntity<?> getAllCategories() {
+        try {
+            List<String> categories = indentRequestRepository.findAllCategories();
+            return ResponseEntity.ok(categories);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Error fetching categories: " + e.getMessage());
+        }
+    }
+
+    @PreAuthorize("hasAnyRole('USER', 'FLA', 'SLA', 'FINANCE', 'PURCHASE', 'STORE')")
+    @GetMapping("/batch/{batchId}")
+    public ResponseEntity<?> getIndentsByBatch(@PathVariable String batchId) {
+        try {
+            List<IndentRequest> indents = indentRequestRepository.findByBatchIdOrderBySequence(batchId);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("batchId", batchId);
+            response.put("indents", indents);
+            response.put("totalCount", indents.size());
+
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Error fetching batch indents: " + e.getMessage());
+        }
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
     // IndentController.java
@@ -538,7 +763,6 @@ public class IndentRequestController {
     }
 
 
-
     @PostMapping("/user/inspection")
     public ResponseEntity<?> confirmProductReceived(@RequestBody Map<String, Object> req, Authentication auth) {
         if (auth == null || !auth.isAuthenticated()) throw new AccessDeniedException("Not authenticated");
@@ -803,23 +1027,6 @@ public class IndentRequestController {
 
         return ResponseEntity.ok(Map.of("message", "Payment cleared successfully"));
     }
-//    @PreAuthorize("hasRole('USER')")
-//    @GetMapping("/user/all")
-//    public ResponseEntity<?> getAllIndentsForUser(Authentication authentication) {
-//        if (authentication == null || !authentication.isAuthenticated()) {
-//            throw new AccessDeniedException("User not authenticated");
-//        }
-//
-//        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
-//        User user = userRepository.findByUsername(userDetails.getUsername())
-//                .orElseThrow(() -> new RuntimeException("User not found"));
-//
-//        List<IndentRequest> userIndents = indentRequestRepository.findByRequestedBy(user);
-//
-//        return ResponseEntity.ok(userIndents);
-//    }
-
-
 
     @GetMapping("/user/all")
     public ResponseEntity<?> getAllIndentsForUser(Authentication authentication) {

@@ -23,6 +23,7 @@ public class IndentRequest {
 
     private String projectName;
     private String itemName;
+    private String category;
     private int quantity;
     private String description;
     private Long perPieceCost;
@@ -31,6 +32,10 @@ public class IndentRequest {
     private String department;
     @Column(name = "specification_model_details", columnDefinition = "TEXT")
     private String specificationModelDetails;
+    private String fileName;
+    private String fileUrl;
+    private String fileType;
+    private Long fileSize;
     @Enumerated(EnumType.STRING)
     @Column(length = 50)
     private IndentStatus status = IndentStatus.PENDING_FLA; // Default status
@@ -69,15 +74,30 @@ public class IndentRequest {
     public void addRemark(String role, String message) {
         this.remarks.add(new Remark(role, message, this));
     }
+
+
+
+    @OneToMany(mappedBy = "indentRequest", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<IndentItem> items = new ArrayList<>();
+
+
+
     private String remarkByStore;
     private LocalDateTime storeApprovalDate;
     @ManyToOne
     @JoinColumn(name = "store_id")
     private User store;
     @ManyToOne
+    @JoinColumn(name = "finance_id")
+    private User finance; // Finance user who approves the payment
+    @ManyToOne
+    @JoinColumn(name = "purchase_id")
+    private User purchase;
+
+    @ManyToOne
     @JoinColumn(name = "assigned_to_id")
     private User assignedTo; // Currently responsible user (e.g., store/finance/purchase)
-    private Date createdAt = new Date();
+    private LocalDateTime createdAt ;
     private LocalDateTime flaApprovalDate;
     private String remarkByFla;
     private String remarkBySla;
@@ -94,5 +114,13 @@ public class IndentRequest {
     private boolean inwardEntryGenerated;
 //    inwardEntryGenerated= false; // Flag to indicate if inward entry is generated
     private Date updatedAt ; // To track the last update time
+
+    // Additional metadata for file handling
+    private LocalDateTime fileUploadedAt;
+    private String uploadedByRole;
+
+    // Batch processing fields
+    private String batchId; // To group multiple indents created together
+    private Integer batchSequence; // Order within the batch
 
 }

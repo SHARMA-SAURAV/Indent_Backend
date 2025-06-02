@@ -56,7 +56,7 @@ public class IndentRequestDTO {
     private LocalDateTime slaApprovalDate;
 //    private String remarkBySla;
 
-    private Date createdAt;
+    private LocalDateTime createdAt;
 //    private String flaUsername; // <-- Add this
     private Date updatedAt;
     private String slaUsername;
