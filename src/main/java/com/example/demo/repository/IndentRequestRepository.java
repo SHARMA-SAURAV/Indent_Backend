@@ -37,8 +37,6 @@ public interface IndentRequestRepository extends JpaRepository<IndentRequest, Lo
 
     @Query("SELECT ir FROM IndentRequest ir JOIN FETCH ir.requestedBy")
     List<IndentRequest> findAllWithUser();
-
- // New methods for category-based operations
  List<IndentRequest> findByCategory(String category);
 
  List<IndentRequest> findByCategoryAndStatus(String category, IndentStatus status);
