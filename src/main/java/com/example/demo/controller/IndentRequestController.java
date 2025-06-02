@@ -10,6 +10,11 @@ import com.example.demo.security.UserDetailsImpl;
 import com.example.demo.service.EmailService;
 import com.example.demo.service.IndentRequestService;
 import jakarta.validation.Valid;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -21,6 +26,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -313,7 +319,113 @@ public ResponseEntity<?> createMultipleIndents(@Valid @RequestBody Map<String, O
             return ResponseEntity.badRequest().body("Error fetching batch indents: " + e.getMessage());
         }
     }
+// Add this file upload endpoint to your controller
 
+    @PreAuthorize("hasRole('USER')")
+    @PostMapping("/upload-file")
+    public ResponseEntity<?> uploadFile(@RequestParam("file") MultipartFile file,
+                                        Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new AccessDeniedException("User not authenticated");
+        }
+
+        try {
+            // Validate file
+            if (file.isEmpty()) {
+                return ResponseEntity.badRequest().body("Please select a file to upload");
+            }
+
+            // Check file size (e.g., max 10MB)
+            long maxFileSize = 10 * 1024 * 1024; // 10MB
+            if (file.getSize() > maxFileSize) {
+                return ResponseEntity.badRequest().body("File size exceeds maximum limit of 10MB");
+            }
+
+            // Validate file types (adjust as needed)
+            String contentType = file.getContentType();
+            List<String> allowedTypes = Arrays.asList(
+                    "application/pdf",
+                    "image/jpeg",
+                    "image/png",
+                    "image/jpg",
+                    "application/msword",
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    "application/vnd.ms-excel",
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            );
+
+            if (!allowedTypes.contains(contentType)) {
+                return ResponseEntity.badRequest().body("File type not supported");
+            }
+
+            // Generate unique filename
+            String originalFileName = file.getOriginalFilename();
+            String fileExtension = originalFileName.substring(originalFileName.lastIndexOf("."));
+            String uniqueFileName = UUID.randomUUID().toString() + fileExtension;
+
+            // Define upload directory (adjust path as needed)
+            String uploadDir = "uploads/indent-files/";
+            Path uploadPath = Paths.get(uploadDir);
+
+            // Create directory if it doesn't exist
+            if (!Files.exists(uploadPath)) {
+                Files.createDirectories(uploadPath);
+            }
+
+            // Save file to disk
+            Path filePath = uploadPath.resolve(uniqueFileName);
+            Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+
+            // Create file URL (adjust base URL as needed)
+            String fileUrl = "/api/files/" + uniqueFileName;
+
+            // Prepare response
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "File uploaded successfully");
+            response.put("fileName", originalFileName);
+            response.put("uniqueFileName", uniqueFileName);
+            response.put("fileUrl", fileUrl);
+            response.put("fileType", contentType);
+            response.put("fileSize", file.getSize());
+
+            return ResponseEntity.ok(response);
+
+        } catch (IOException e) {
+            System.err.println("Error uploading file: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error uploading file: " + e.getMessage());
+        } catch (Exception e) {
+            System.err.println("Unexpected error: " + e.getMessage());
+            return ResponseEntity.badRequest().body("Error processing file upload: " + e.getMessage());
+        }
+    }
+
+    // Add this endpoint to serve uploaded files
+    @GetMapping("/files/{fileName}")
+    public ResponseEntity<Resource> downloadFile(@PathVariable String fileName) {
+        try {
+            String uploadDir = "uploads/indent-files/";
+            Path filePath = Paths.get(uploadDir).resolve(fileName).normalize();
+
+            Resource resource = new UrlResource(filePath.toUri());
+
+            if (resource.exists() && resource.isReadable()) {
+                String contentType = Files.probeContentType(filePath);
+                if (contentType == null) {
+                    contentType = "application/octet-stream";
+                }
+
+                return ResponseEntity.ok()
+                        .contentType(MediaType.parseMediaType(contentType))
+                        .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + fileName + "\"")
+                        .body(resource);
+            } else {
+                return ResponseEntity.notFound().build();
+            }
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
 
 
 
