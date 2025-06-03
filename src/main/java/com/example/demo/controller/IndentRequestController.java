@@ -823,6 +823,81 @@ public ResponseEntity<?> createIndent(
 
 
 
+
+
+
+//    @PostMapping("/finance/approve")
+//    public ResponseEntity<?> approveIndentAsFinance(@RequestBody Map<String, Object> request,
+//                                                    Authentication authentication) {
+//        if (authentication == null || !authentication.isAuthenticated()) {
+//            throw new AccessDeniedException("Not authenticated");
+//        }
+//        Long indentId = Long.valueOf(request.get("indentId").toString());
+//        String remark = (String) request.get("remark");
+//
+//        IndentRequest indent = indentRequestRepository.findById(indentId)
+//                .orElseThrow(() -> new RuntimeException("Indent not found"));
+//
+//        if (indent.getStatus() != IndentStatus.PENDING_FINANCE) {
+//            return ResponseEntity.badRequest().body("Indent not in Finance stage");
+//        }
+//
+//        // Set remark and update status
+//        indent.setRemarkByFinance(remark);
+//        indent.setStatus(IndentStatus.PENDING_PURCHASE);  // Move to Purchase
+//        indent.setFinanceApprovalDate(LocalDateTime.now());
+//
+//        indentRequestRepository.save(indent);
+//
+//        String emailBody = "Hello " + "Purchase User" + ",\n\n" +
+//                "An indent request has been approved by SLA and is now pending your approval.\n" +
+//                "Indent ID: " + indentId + "\n" +
+//                "Project Name: " + indent.getProjectName() + "\n" +
+//                "Item Name: " + indent.getItemName() + "\n" +
+//                "Quantity: " + indent.getQuantity() + "\n" +
+//                "Per Piece Cost: " + indent.getPerPieceCost() + "\n" +
+//                "Department: " + indent.getDepartment() + "\n" +
+//                "Description: " + indent.getDescription() + "\n\n" +
+//                "Please log in to the system to review the request.\n\n" +
+//                "Best regards,\n" +
+//                "Your Indent Management System";
+//        emailService.sendEmail("purchaseUser@gmail.com", "Indent Approval Required", emailBody);
+//
+//        return ResponseEntity.ok(Map.of("message", "Approved and forwarded to Purchase"));
+//    }
+//
+//
+//    @PostMapping("/finance/reject")
+//    public ResponseEntity<?> rejectIndentAsFinance(@RequestBody Map<String, Object> request,
+//                                                   Authentication authentication) {
+//        if (authentication == null || !authentication.isAuthenticated()) {
+//            throw new AccessDeniedException("Not authenticated");
+//        }
+//
+//
+//        Long indentId = Long.valueOf(request.get("indentId").toString());
+//        String remark = (String) request.get("remark");
+//
+//        System.err.println("remark:------------" + remark);
+//        IndentRequest indent = indentRequestRepository.findById(indentId)
+//                .orElseThrow(() -> new RuntimeException("Indent not found"));
+//
+//        if (indent.getStatus() != IndentStatus.PENDING_FINANCE) {
+//            return ResponseEntity.badRequest().body("Indent not in Finance stage");
+//        }
+//
+//        indent.setRemarkByFinance(remark);
+//        indent.setStatus(IndentStatus.REJECTED_BY_FINANCE);
+//        indent.setFinanceApprovalDate(LocalDateTime.now());
+//
+//        indentRequestRepository.save(indent);
+//        emailrejectedindent("Finance", indent, indentId);
+//
+//
+//
+//        return ResponseEntity.ok(Map.of("message", "Indent rejected by Finance"));
+//    }
+
     @GetMapping("/finance/pending")
     public ResponseEntity<?> getPendingIndentsForFinance(Authentication authentication) {
         if (authentication == null || !authentication.isAuthenticated()) {
@@ -834,77 +909,53 @@ public ResponseEntity<?> createIndent(
     }
 
 
-    @PostMapping("/finance/approve")
-    public ResponseEntity<?> approveIndentAsFinance(@RequestBody Map<String, Object> request,
-                                                    Authentication authentication) {
-        if (authentication == null || !authentication.isAuthenticated()) {
-            throw new AccessDeniedException("Not authenticated");
-        }
-        Long indentId = Long.valueOf(request.get("indentId").toString());
-        String remark = (String) request.get("remark");
-
-        IndentRequest indent = indentRequestRepository.findById(indentId)
-                .orElseThrow(() -> new RuntimeException("Indent not found"));
-
-        if (indent.getStatus() != IndentStatus.PENDING_FINANCE) {
-            return ResponseEntity.badRequest().body("Indent not in Finance stage");
-        }
-
-        // Set remark and update status
-        indent.setRemarkByFinance(remark);
-        indent.setStatus(IndentStatus.PENDING_PURCHASE);  // Move to Purchase
-        indent.setFinanceApprovalDate(LocalDateTime.now());
-
-        indentRequestRepository.save(indent);
-
-        String emailBody = "Hello " + "Purchase User" + ",\n\n" +
-                "An indent request has been approved by SLA and is now pending your approval.\n" +
-                "Indent ID: " + indentId + "\n" +
-                "Project Name: " + indent.getProjectName() + "\n" +
-                "Item Name: " + indent.getItemName() + "\n" +
-                "Quantity: " + indent.getQuantity() + "\n" +
-                "Per Piece Cost: " + indent.getPerPieceCost() + "\n" +
-                "Department: " + indent.getDepartment() + "\n" +
-                "Description: " + indent.getDescription() + "\n\n" +
-                "Please log in to the system to review the request.\n\n" +
-                "Best regards,\n" +
-                "Your Indent Management System";
-        emailService.sendEmail("purchaseUser@gmail.com", "Indent Approval Required", emailBody);
-
-        return ResponseEntity.ok(Map.of("message", "Approved and forwarded to Purchase"));
-    }
-
-
-    @PostMapping("/finance/reject")
-    public ResponseEntity<?> rejectIndentAsFinance(@RequestBody Map<String, Object> request,
-                                                   Authentication authentication) {
+    @PostMapping("/finance/review-products")
+    public ResponseEntity<?> reviewProductsByFinance(@RequestBody Map<String, Object> request,
+                                                     Authentication authentication) {
         if (authentication == null || !authentication.isAuthenticated()) {
             throw new AccessDeniedException("Not authenticated");
         }
 
-
         Long indentId = Long.valueOf(request.get("indentId").toString());
-        String remark = (String) request.get("remark");
+        System.err.println("Finance review endpoint hit for indentId = " + indentId);
+        List<Integer> approvedProductIds = (List<Integer>) request.get("approvedProductIds");
+        List<Integer> rejectedProductIds = (List<Integer>) request.get("rejectedProductIds");
+        Map<String, String> remarks = (Map<String, String>) request.get("remarks");
 
-        System.err.println("remark:------------" + remark);
         IndentRequest indent = indentRequestRepository.findById(indentId)
                 .orElseThrow(() -> new RuntimeException("Indent not found"));
 
-        if (indent.getStatus() != IndentStatus.PENDING_FINANCE) {
-            return ResponseEntity.badRequest().body("Indent not in Finance stage");
+        boolean anyApproved = false;
+        boolean anyRejected = false;
+
+        for (IndentProduct product : indent.getItems()) {
+            if (product.getProductStatus() == ProductStatus.APPROVED_BY_STORE) {
+                if (approvedProductIds.contains(product.getId().intValue())) {
+                    System.err.println("Product " + product.getId() + " approved by Finance");
+                    product.setProductStatus(ProductStatus.APPROVED_BY_FINANCE);
+                    anyApproved = true;
+                } else if (rejectedProductIds.contains(product.getId().intValue())) {
+                    System.err.println("Product " + product.getId() + " rejected by Finance");
+                    product.setProductStatus(ProductStatus.REJECTED_BY_FINANCE);
+                    anyRejected = true;
+                }
+                product.setFinanceRemarks(remarks.getOrDefault(product.getId().toString(), ""));
+            }
         }
 
-        indent.setRemarkByFinance(remark);
-        indent.setStatus(IndentStatus.REJECTED_BY_FINANCE);
         indent.setFinanceApprovalDate(LocalDateTime.now());
+        indent.setRemarkByFinance("Reviewed by Finance");
+
+        if (anyApproved) {
+            indent.setStatus(IndentStatus.PENDING_PURCHASE);
+        } else if (anyRejected && !anyApproved) {
+            indent.setStatus(IndentStatus.REJECTED_BY_FINANCE);
+        }
 
         indentRequestRepository.save(indent);
-        emailrejectedindent("Finance", indent, indentId);
-
-
-
-        return ResponseEntity.ok(Map.of("message", "Indent rejected by Finance"));
+        return ResponseEntity.ok(Map.of("message", "Finance review completed"));
     }
+
 
 
     @PostMapping("/finance/payment/reject")

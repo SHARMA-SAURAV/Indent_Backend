@@ -10,5 +10,9 @@ public enum ProductStatus {
     APPROVED_BY_SLA,
     REJECTED_BY_SLA,// Approved with modifications (quantity/cost changes)
     APPROVED_BY_STORE,
-    REJECTED_BY_STORE, // Approved by Store
+    REJECTED_BY_STORE,
+    APPROVED_BY_FINANCE,// Approved by Store
+    REJECTED_BY_FINANCE,
+    APPROVED_BY_PURCHASE,
+    REJECTED_BY_PURCHASE,// Rejected by Store
 }

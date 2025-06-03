@@ -1,9 +1,6 @@
 package com.example.demo.controller;
 
-import com.example.demo.model.IndentRequest;
-import com.example.demo.model.IndentStatus;
-import com.example.demo.model.PurchaseReview;
-import com.example.demo.model.User;
+import com.example.demo.model.*;
 import com.example.demo.repository.IndentRequestRepository;
 import com.example.demo.repository.PurchaseReviewRepository;
 import com.example.demo.service.EmailService;
@@ -32,35 +29,35 @@ public class PurchaseController {
     private EmailService emailService;
 
     // POST: Add Purchase Review
-    @PostMapping("/add-review")
-    public ResponseEntity<?> addReview(@RequestBody Map<String, String> request,
-                                       Authentication authentication) {
-        if (authentication == null || !authentication.isAuthenticated()) {
-            throw new AccessDeniedException("Not authenticated");
-        }
-
-        Long indentId = Long.valueOf(request.get("indentId"));
-        String comment = request.get("comment");
-        String reviewer = authentication.getName();
-
-        IndentRequest indent = indentRequestRepository.findById(indentId)
-                .orElseThrow(() -> new RuntimeException("Indent not found"));
-
-//        PurchaseReview review = new PurchaseReview(reviewer, comment, indent);
-
-        PurchaseReview review = new PurchaseReview();
-        review.setReviewer(reviewer);
-        review.setComment(comment);
-        review.setIndentRequest(indent);
-//        review.setReviewedAt(LocalDateTime.now());
-        review.setReviewDate(LocalDateTime.now());
-        purchaseReviewRepository.save(review);
-
-        return ResponseEntity.ok(Map.of("message", "Review added successfully"));
-    }
+//    @PostMapping("/add-review")
+//    public ResponseEntity<?> addReview(@RequestBody Map<String, String> request,
+//                                       Authentication authentication) {
+//        if (authentication == null || !authentication.isAuthenticated()) {
+//            throw new AccessDeniedException("Not authenticated");
+//        }
+//
+//        Long indentId = Long.valueOf(request.get("indentId"));
+//        String comment = request.get("comment");
+//        String reviewer = authentication.getName();
+//
+//        IndentRequest indent = indentRequestRepository.findById(indentId)
+//                .orElseThrow(() -> new RuntimeException("Indent not found"));
+//
+////        PurchaseReview review = new PurchaseReview(reviewer, comment, indent);
+//
+//        PurchaseReview review = new PurchaseReview();
+//        review.setReviewer(reviewer);
+//        review.setComment(comment);
+//        review.setIndentRequest(indent);
+////        review.setReviewedAt(LocalDateTime.now());
+//        review.setReviewDate(LocalDateTime.now());
+//        purchaseReviewRepository.save(review);
+//
+//        return ResponseEntity.ok(Map.of("message", "Review added successfully"));
+//    }
 
     // POST: Complete the Indent (Only if Inward Entry is true)
-    @PostMapping("/complete")
+   /* @PostMapping("/complete")
     public ResponseEntity<?> completeIndent(@RequestBody Map<String, Object> request,
                                             Authentication authentication) {
         if (authentication == null || !authentication.isAuthenticated()) {
@@ -98,7 +95,7 @@ public class PurchaseController {
 
         return ResponseEntity.ok(Map.of("message", "Indent marked as WAITING_FOR_USER_CONFIRMATION"));
     }
-
+*/
     // GET: All Reviews for a given indent
     @GetMapping("/{indentId}/reviews")
     public ResponseEntity<?> getReviewsForIndent(@PathVariable Long indentId) {
@@ -187,5 +184,115 @@ public class PurchaseController {
 
         return ResponseEntity.ok(purchaseRelevant);
     }
+
+
+
+    // POST: Purchase reviews individual indent items
+    @PostMapping("/review-products")
+    public ResponseEntity<?> reviewProducts(@RequestBody Map<String, Object> request,
+                                            Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new AccessDeniedException("Not authenticated");
+        }
+
+        Long indentId = Long.valueOf(request.get("indentId").toString());
+        List<Integer> approvedProductIds = (List<Integer>) request.get("approvedProductIds");
+        List<Integer> rejectedProductIds = (List<Integer>) request.get("rejectedProductIds");
+        Map<String, String> remarks = (Map<String, String>) request.get("remarks");
+
+        IndentRequest indent = indentRequestRepository.findById(indentId)
+                .orElseThrow(() -> new RuntimeException("Indent not found"));
+
+        boolean anyApproved = false;
+        boolean anyRejected = false;
+
+        for (IndentProduct product : indent.getItems()) {
+            if (product.getProductStatus() == ProductStatus.APPROVED_BY_FINANCE) {
+                if (approvedProductIds.contains(product.getId().intValue())) {
+                    product.setProductStatus(ProductStatus.APPROVED_BY_PURCHASE);
+                    anyApproved = true;
+                } else if (rejectedProductIds.contains(product.getId().intValue())) {
+                    product.setProductStatus(ProductStatus.REJECTED_BY_PURCHASE);
+                    anyRejected = true;
+                }
+                product.setPurchaseRemarks(remarks.getOrDefault(product.getId().toString(), ""));
+            }
+        }
+
+        indent.setRemarkByPurchase("Reviewed by Purchase");
+        indent.setPurchaseCompletionDate(LocalDateTime.now());
+
+        if (anyApproved && indent.isInwardEntryGenerated()) {
+            indent.setStatus(IndentStatus.WAITING_FOR_USER_CONFIRMATION);
+        } else if (anyRejected && !anyApproved) {
+            indent.setStatus(IndentStatus.PURCHASE_REJECTED);
+        } else {
+            indent.setStatus(IndentStatus.PURCHASE_PROCESSING); // Custom enum for "in progress"
+        }
+
+        indentRequestRepository.save(indent);
+        return ResponseEntity.ok(Map.of("message", "Purchase review completed"));
+    }
+
+
+    @PostMapping("/add-review")
+    public ResponseEntity<?> addReview(@RequestBody Map<String, String> request,
+                                       Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new AccessDeniedException("Not authenticated");
+        }
+
+        Long indentId = Long.valueOf(request.get("indentId"));
+        String comment = request.get("comment");
+        String reviewer = authentication.getName();
+
+        IndentRequest indent = indentRequestRepository.findById(indentId)
+                .orElseThrow(() -> new RuntimeException("Indent not found"));
+
+        PurchaseReview review = new PurchaseReview();
+        review.setReviewer(reviewer);
+        review.setComment(comment);
+        review.setIndentRequest(indent);
+        review.setReviewDate(LocalDateTime.now());
+
+        purchaseReviewRepository.save(review);
+
+        return ResponseEntity.ok(Map.of("message", "Review added successfully"));
+    }
+
+    @PostMapping("/complete")
+    public ResponseEntity<?> completeIndent(@RequestBody Map<String, Object> request,
+                                            Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new AccessDeniedException("Not authenticated");
+        }
+
+        Long indentId = Long.valueOf(request.get("indentId").toString());
+        String remark = (String) request.get("remark");
+
+        IndentRequest indent = indentRequestRepository.findById(indentId)
+                .orElseThrow(() -> new RuntimeException("Indent not found"));
+
+        if (!indent.isInwardEntryGenerated()) {
+            return ResponseEntity.badRequest().body("Inward Entry must be generated before approval");
+        }
+
+        indent.setRemarkByPurchase(remark);
+        indent.setStatus(IndentStatus.WAITING_FOR_USER_CONFIRMATION);
+        indent.setPurchaseCompletionDate(LocalDateTime.now());
+
+        indentRequestRepository.save(indent);
+
+        User user = indent.getRequestedBy();
+        if (user != null && user.getEmail() != null) {
+            String emailBody = "Hello " + user.getUsername() + ",\n\n" +
+                    "Your indent has been approved by Purchase and is now pending your inspection.\n" +
+                    "Indent ID: " + indentId + "\n\n" +
+                    "Regards,\nIndent System";
+            emailService.sendEmail(user.getEmail(), "Indent Approved by Purchase", emailBody);
+        }
+        return ResponseEntity.ok(Map.of("message", "Indent marked as WAITING_FOR_USER_CONFIRMATION"));
+    }
+
 
 }
