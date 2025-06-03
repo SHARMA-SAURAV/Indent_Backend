@@ -9,6 +9,10 @@ import com.example.demo.repository.UserRepository;
 import com.example.demo.security.UserDetailsImpl;
 import com.example.demo.service.EmailService;
 import com.example.demo.service.IndentRequestService;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import jakarta.validation.Valid;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
@@ -114,318 +118,118 @@ public class IndentRequestController {
 //    }
 
 
+//@PostMapping(value = "/create", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+//public ResponseEntity<?> createIndent(
+//        @RequestPart("indentData") String indentData,
+//        @RequestPart("file") MultipartFile file,
+//        Authentication auth
+//) throws IOException {
+//
+//    if (auth == null || !auth.isAuthenticated()) {
+//        throw new AccessDeniedException("Not authenticated");
+//    }
+//
+//    UserDetailsImpl userDetails = (UserDetailsImpl) auth.getPrincipal();
+//    User user = userRepository.findByUsername(userDetails.getUsername())
+//            .orElseThrow(() -> new RuntimeException("User not found"));
+//
+//    // Parse the JSON data
+//    ObjectMapper objectMapper = new ObjectMapper();
+//    IndentRequest indentRequest = objectMapper.readValue(indentData, IndentRequest.class);
+//
+//    // Set user and status
+//    indentRequest.setRequestedBy(user);
+//    indentRequest.setStatus(IndentStatus.PENDING_FLA);
+//    indentRequest.setCreatedAt(LocalDateTime.now());
+//
+//    // Link each item to parent
+//    for (IndentProduct item : indentRequest.getItems()) {
+//        item.setIndentRequest(indentRequest);
+//    }
+//
+//    // Save file to disk (you can customize path or DB storage)
+//    String uploadDir = "uploads/";
+//    String fileName = UUID.randomUUID() + "_" + file.getOriginalFilename();
+//    Path path = Paths.get(uploadDir + fileName);
+//    Files.createDirectories(path.getParent());
+//    Files.write(path, file.getBytes());
+//
+//    // Save file path in request
+//    indentRequest.setAttachmentPath(fileName);
+//
+//    // Save indent
+//    IndentRequest saved = indentRequestRepository.save(indentRequest);
+//
+//    return ResponseEntity.ok(saved);
+//}
 
 
-@PreAuthorize("hasRole('USER')")
-@PostMapping("/create-multiple")
-public ResponseEntity<?> createMultipleIndents(@Valid @RequestBody Map<String, Object> request,
-                                               Authentication authentication) {
-    if (authentication == null || !authentication.isAuthenticated()) {
-        throw new AccessDeniedException("User not authenticated");
+
+
+
+
+@PostMapping(value = "/create", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+public ResponseEntity<?> createIndent(
+        @RequestPart("indentData") String indentData,
+        @RequestPart("file") MultipartFile file,
+        Authentication auth
+) throws IOException {
+
+    if (auth == null || !auth.isAuthenticated()) {
+        throw new AccessDeniedException("Not authenticated");
     }
 
-    UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+    UserDetailsImpl userDetails = (UserDetailsImpl) auth.getPrincipal();
     User user = userRepository.findByUsername(userDetails.getUsername())
             .orElseThrow(() -> new RuntimeException("User not found"));
 
-    try {
-        // Extract common fields
-        String recipientType = (String) request.get("recipientType");
-        Long recipientId = Long.valueOf(request.get("recipientId").toString());
-        String projectName = (String) request.get("projectName");
-        String purpose = (String) request.get("purpose");
-        String department = (String) request.get("department");
+    // Use ObjectNode to extract fields manually
+    ObjectMapper objectMapper = new ObjectMapper();
+    JsonNode root = objectMapper.readTree(indentData);
 
-        // Extract items array
-        @SuppressWarnings("unchecked")
-        List<Map<String, Object>> itemsList = (List<Map<String, Object>>) request.get("items");
+    String recipientType = root.get("recipientType").asText();  // ✅ FLA or SLA
+    Long recipientId = root.get("recipientId").asLong();
 
-        if (itemsList == null || itemsList.isEmpty()) {
-            return ResponseEntity.badRequest().body("At least one item is required");
-        }
+    // Remove extra fields before mapping to IndentRequest
+    ((ObjectNode) root).remove("recipientType");
+    ((ObjectNode) root).remove("recipientId");
 
-        List<IndentRequest> createdIndents = new ArrayList<>();
+    // Deserialize clean JSON to IndentRequest
+    IndentRequest indentRequest = objectMapper.treeToValue(root, IndentRequest.class);
 
-        // Process each item and create separate indent requests
-        for (Map<String, Object> itemData : itemsList) {
-            String itemName = (String) itemData.get("itemName");
-            String category = (String) itemData.get("category");
-            int quantity = (int) itemData.get("quantity");
-            Long perPieceCost = Long.valueOf(itemData.get("perPieceCost").toString());
-            String description = (String) itemData.get("description");
-            String specificationModelDetails = (String) itemData.get("specificationModelDetails");
-            Double totalCost = Double.valueOf(itemData.get("totalCost").toString());
+    indentRequest.setRequestedBy(user);
+    indentRequest.setCreatedAt(LocalDateTime.now());
+    indentRequest.setStatus(IndentStatus.PENDING_FLA); // or handle dynamically later
 
-            // Handle file upload information
-            String fileName = (String) itemData.get("fileName");
-            String fileUrl = (String) itemData.get("fileUrl");
-            String fileType = (String) itemData.get("fileType");
-
-            System.err.println("Creating indent for item: " + itemName + ", Category: " + category);
-
-            IndentRequest indent = indentRequestService.createIndentRequestWithCategory(
-                    (long) user.getId(), itemName, category, quantity, perPieceCost,
-                    description, recipientType, recipientId, projectName, totalCost,
-                    purpose, department, specificationModelDetails, fileName, fileUrl, fileType);
-
-            createdIndents.add(indent);
-        }
-
-        // Return response with created indents
-        Map<String, Object> response = new HashMap<>();
-        response.put("message", "Successfully created " + createdIndents.size() + " indent requests");
-        response.put("indents", createdIndents);
-        response.put("totalIndents", createdIndents.size());
-
-        return ResponseEntity.ok(response);
-
-    } catch (Exception e) {
-        System.err.println("Error creating multiple indents: " + e.getMessage());
-        return ResponseEntity.badRequest().body("Error creating indents: " + e.getMessage());
+    // Link products
+    for (IndentProduct item : indentRequest.getItems()) {
+        item.setIndentRequest(indentRequest);
     }
+
+    // Save file to disk
+    String uploadDir = "uploads/";
+    String fileName = UUID.randomUUID() + "_" + file.getOriginalFilename();
+    Path path = Paths.get(uploadDir + fileName);
+    Files.createDirectories(path.getParent());
+    Files.write(path, file.getBytes());
+    indentRequest.setAttachmentPath(fileName);
+
+    // TODO: Based on recipientType and recipientId set FLA or SLA
+    if ("FLA".equalsIgnoreCase(recipientType)) {
+        User fla = userRepository.findById(recipientId).orElseThrow(() -> new RuntimeException("FLA not found"));
+        indentRequest.setFla(fla);
+        indentRequest.setStatus(IndentStatus.PENDING_FLA);
+    } else if ("SLA".equalsIgnoreCase(recipientType)) {
+        User sla = userRepository.findById(recipientId).orElseThrow(() -> new RuntimeException("SLA not found"));
+        indentRequest.setSla(sla);
+        indentRequest.setStatus(IndentStatus.PENDING_SLA); // Skip FLA directly
+    }
+
+    IndentRequest saved = indentRequestRepository.save(indentRequest);
+
+    return ResponseEntity.ok(saved);
 }
 
-    @PreAuthorize("hasRole('USER')")
-    @PostMapping("/create-draft")
-    public ResponseEntity<?> createDraftIndents(@Valid @RequestBody Map<String, Object> request,
-                                                Authentication authentication) {
-        if (authentication == null || !authentication.isAuthenticated()) {
-            throw new AccessDeniedException("User not authenticated");
-        }
-
-        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
-        User user = userRepository.findByUsername(userDetails.getUsername())
-                .orElseThrow(() -> new RuntimeException("User not found"));
-
-        try {
-            // Save items as draft (temporary storage)
-            @SuppressWarnings("unchecked")
-            List<Map<String, Object>> itemsList = (List<Map<String, Object>>) request.get("items");
-
-            // You can store this in a temporary table or cache for later processing
-            // For now, returning the processed data for frontend confirmation
-
-            Map<String, Object> response = new HashMap<>();
-            response.put("message", "Draft saved successfully");
-            response.put("itemCount", itemsList.size());
-            response.put("items", itemsList);
-
-            return ResponseEntity.ok(response);
-
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body("Error saving draft: " + e.getMessage());
-        }
-    }
-
-    // Keep the original single indent creation for backward compatibility
-    @PreAuthorize("hasRole('USER')")
-    @PostMapping("/create")
-    public ResponseEntity<?> createIndent(@Valid @RequestBody Map<String, Object> request,
-                                          Authentication authentication) {
-        if (authentication == null || !authentication.isAuthenticated()) {
-            throw new AccessDeniedException("User not authenticated");
-        }
-
-        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
-        User user = userRepository.findByUsername(userDetails.getUsername())
-                .orElseThrow(() -> new RuntimeException("User not found"));
-
-        String recipientType = (String) request.get("recipientType");
-        Long recipientId = Long.valueOf(request.get("recipientId").toString());
-        String projectName = (String) request.get("projectName");
-        String itemName = (String) request.get("itemName");
-        String category = (String) request.get("category"); // New field
-        int quantity = (int) request.get("quantity");
-        Long perPieceCost = Long.valueOf((request.get("perPieceCost").toString()));
-        String description = (String) request.get("description");
-        Double totalCost = Double.valueOf(request.get("totalCost").toString());
-        String purpose = (String) request.get("purpose");
-        String department = (String) request.get("department");
-        String specificationModelDetails = (String) request.get("specificationModelDetails");
-
-        // File upload fields
-        String fileName = (String) request.get("fileName");
-        String fileUrl = (String) request.get("fileUrl");
-        String fileType = (String) request.get("fileType");
-
-        System.err.println("Project Name: " + projectName);
-        System.err.println("Item Name: " + itemName);
-        System.err.println("Category: " + category);
-        System.err.println("Quantity: " + quantity);
-        System.err.println("Per Piece Cost: " + perPieceCost);
-        System.err.println("Description: " + description);
-        System.err.println("File Name: " + fileName);
-
-        IndentRequest indent = indentRequestService.createIndentRequestWithCategory(
-                (long) user.getId(), itemName, category, quantity, perPieceCost, description,
-                recipientType, recipientId, projectName, totalCost, purpose,
-                department, specificationModelDetails, fileName, fileUrl, fileType);
-
-        return ResponseEntity.ok(indent);
-    }
-
-    @PreAuthorize("hasAnyRole('USER', 'FLA', 'SLA', 'FINANCE', 'PURCHASE', 'STORE')")
-    @GetMapping("/by-category/{category}")
-    public ResponseEntity<?> getIndentsByCategory(@PathVariable String category,
-                                                  Authentication authentication) {
-        if (authentication == null || !authentication.isAuthenticated()) {
-            throw new AccessDeniedException("User not authenticated");
-        }
-
-        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
-        String userRole = userDetails.getAuthorities().iterator().next().getAuthority().replace("ROLE_", "");
-
-        try {
-            List<IndentRequest> indents = indentRequestService.getIndentsByCategory(category, userRole);
-
-            Map<String, Object> response = new HashMap<>();
-            response.put("category", category);
-            response.put("userRole", userRole);
-            response.put("indents", indents);
-            response.put("totalCount", indents.size());
-
-            return ResponseEntity.ok(response);
-
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body("Error fetching indents by category: " + e.getMessage());
-        }
-    }
-
-    @PreAuthorize("hasAnyRole('USER', 'FLA', 'SLA', 'FINANCE', 'PURCHASE', 'STORE')")
-    @GetMapping("/categories")
-    public ResponseEntity<?> getAllCategories() {
-        try {
-            List<String> categories = indentRequestRepository.findAllCategories();
-            return ResponseEntity.ok(categories);
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body("Error fetching categories: " + e.getMessage());
-        }
-    }
-
-    @PreAuthorize("hasAnyRole('USER', 'FLA', 'SLA', 'FINANCE', 'PURCHASE', 'STORE')")
-    @GetMapping("/batch/{batchId}")
-    public ResponseEntity<?> getIndentsByBatch(@PathVariable String batchId) {
-        try {
-            List<IndentRequest> indents = indentRequestRepository.findByBatchIdOrderBySequence(batchId);
-
-            Map<String, Object> response = new HashMap<>();
-            response.put("batchId", batchId);
-            response.put("indents", indents);
-            response.put("totalCount", indents.size());
-
-            return ResponseEntity.ok(response);
-
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body("Error fetching batch indents: " + e.getMessage());
-        }
-    }
-// Add this file upload endpoint to your controller
-
-    @PreAuthorize("hasRole('USER')")
-    @PostMapping("/upload-file")
-    public ResponseEntity<?> uploadFile(@RequestParam("file") MultipartFile file,
-                                        Authentication authentication) {
-        if (authentication == null || !authentication.isAuthenticated()) {
-            throw new AccessDeniedException("User not authenticated");
-        }
-
-        try {
-            // Validate file
-            if (file.isEmpty()) {
-                return ResponseEntity.badRequest().body("Please select a file to upload");
-            }
-
-            // Check file size (e.g., max 10MB)
-            long maxFileSize = 10 * 1024 * 1024; // 10MB
-            if (file.getSize() > maxFileSize) {
-                return ResponseEntity.badRequest().body("File size exceeds maximum limit of 10MB");
-            }
-
-            // Validate file types (adjust as needed)
-            String contentType = file.getContentType();
-            List<String> allowedTypes = Arrays.asList(
-                    "application/pdf",
-                    "image/jpeg",
-                    "image/png",
-                    "image/jpg",
-                    "application/msword",
-                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                    "application/vnd.ms-excel",
-                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            );
-
-            if (!allowedTypes.contains(contentType)) {
-                return ResponseEntity.badRequest().body("File type not supported");
-            }
-
-            // Generate unique filename
-            String originalFileName = file.getOriginalFilename();
-            String fileExtension = originalFileName.substring(originalFileName.lastIndexOf("."));
-            String uniqueFileName = UUID.randomUUID().toString() + fileExtension;
-
-            // Define upload directory (adjust path as needed)
-            String uploadDir = "uploads/indent-files/";
-            Path uploadPath = Paths.get(uploadDir);
-
-            // Create directory if it doesn't exist
-            if (!Files.exists(uploadPath)) {
-                Files.createDirectories(uploadPath);
-            }
-
-            // Save file to disk
-            Path filePath = uploadPath.resolve(uniqueFileName);
-            Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
-
-            // Create file URL (adjust base URL as needed)
-            String fileUrl = "/api/files/" + uniqueFileName;
-
-            // Prepare response
-            Map<String, Object> response = new HashMap<>();
-            response.put("message", "File uploaded successfully");
-            response.put("fileName", originalFileName);
-            response.put("uniqueFileName", uniqueFileName);
-            response.put("fileUrl", fileUrl);
-            response.put("fileType", contentType);
-            response.put("fileSize", file.getSize());
-
-            return ResponseEntity.ok(response);
-
-        } catch (IOException e) {
-            System.err.println("Error uploading file: " + e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("Error uploading file: " + e.getMessage());
-        } catch (Exception e) {
-            System.err.println("Unexpected error: " + e.getMessage());
-            return ResponseEntity.badRequest().body("Error processing file upload: " + e.getMessage());
-        }
-    }
-
-    // Add this endpoint to serve uploaded files
-    @GetMapping("/files/{fileName}")
-    public ResponseEntity<Resource> downloadFile(@PathVariable String fileName) {
-        try {
-            String uploadDir = "uploads/indent-files/";
-            Path filePath = Paths.get(uploadDir).resolve(fileName).normalize();
-
-            Resource resource = new UrlResource(filePath.toUri());
-
-            if (resource.exists() && resource.isReadable()) {
-                String contentType = Files.probeContentType(filePath);
-                if (contentType == null) {
-                    contentType = "application/octet-stream";
-                }
-
-                return ResponseEntity.ok()
-                        .contentType(MediaType.parseMediaType(contentType))
-                        .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + fileName + "\"")
-                        .body(resource);
-            } else {
-                return ResponseEntity.notFound().build();
-            }
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().build();
-        }
-    }
 
 
 
@@ -437,15 +241,6 @@ public ResponseEntity<?> createMultipleIndents(@Valid @RequestBody Map<String, O
 
 
 
-
-
-
-
-
-
-
-
-    // IndentController.java
     @GetMapping("/fla/pending")
     public ResponseEntity<?> getPendingIndentsForFLA(Authentication authentication) {
         if (authentication == null || !authentication.isAuthenticated()) {
@@ -453,106 +248,321 @@ public ResponseEntity<?> createMultipleIndents(@Valid @RequestBody Map<String, O
         }
 
         UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
-        String username = userDetails.getUsername();
+        User flaUser = userRepository.findByUsername(userDetails.getUsername())
+                .orElseThrow(() -> new RuntimeException("User not found"));
 
-        User flaUser = userRepository.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("FLA user not found"));
+        List<IndentRequest> pendingIndents = indentRequestRepository.findByFlaAndStatus(flaUser, IndentStatus.PENDING_FLA);
 
-        List<IndentRequest> pendingIndents = indentRequestRepository
-                .findByFlaAndStatus(flaUser, IndentStatus.PENDING_FLA);
+        // Filter to return only if any product is still pending
+        List<IndentRequest> filtered = pendingIndents.stream()
+                .filter(ir -> ir.getItems().stream()
+                        .anyMatch(p -> p.getProductStatus() == ProductStatus.PENDING))
+                .toList();
 
-        return ResponseEntity.ok(pendingIndents);
+        return ResponseEntity.ok(filtered);
     }
 
 
-    // IndentController.java
-    @PostMapping("/fla/approve")
-    public ResponseEntity<?> approveIndentAsFLA(@RequestBody Map<String, Object> request,
-                                                Authentication authentication) {
+    @PostMapping("/fla/approve-products")
+    public ResponseEntity<?> approveProductsByFLA(@RequestBody Map<String, Object> request, Authentication authentication) {
         if (authentication == null || !authentication.isAuthenticated()) {
             throw new AccessDeniedException("Not authenticated");
         }
 
         Long indentId = Long.valueOf(request.get("indentId").toString());
-        String remark = (String) request.get("remark");
+        Long slaId = Long.valueOf(request.get("slaId").toString());
+        List<Integer> approvedProductIds = (List<Integer>) request.get("approvedProductIds");
+        Map<String, String> remarks = (Map<String, String>) request.get("remarks");
+
+        IndentRequest indent = indentRequestRepository.findById(indentId)
+                .orElseThrow(() -> new RuntimeException("Indent not found"));
+
+        boolean anyApproved = false;
+        for (IndentProduct product : indent.getItems()) {
+            if (product.getProductStatus() == ProductStatus.PENDING) {
+                if (approvedProductIds.contains(product.getId().intValue())) {
+                    product.setProductStatus(ProductStatus.APPROVED_BY_FLA);
+                    anyApproved = true;
+                } else {
+                    product.setProductStatus(ProductStatus.REJECTED_BY_FLA);
+                }
+                product.setFlaRemarks(remarks.getOrDefault(product.getId().toString(), ""));
+            }
+        }
+
+        indent.setFlaApprovalDate(LocalDateTime.now());
+        indent.setRemarkByFla("Approved some items");
+        indent.setSla(userRepository.findById(slaId).orElseThrow(() -> new RuntimeException("SLA not found")));
+
+        indent.setStatus(anyApproved ? IndentStatus.PENDING_SLA : IndentStatus.REJECTED_BY_FLA);
+
+        indentRequestRepository.save(indent);
+        return ResponseEntity.ok(Map.of("message", "Products processed"));
+    }
+
+    @GetMapping("/fla/rejected")
+    public ResponseEntity<?> getFullyRejectedByFLA(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new AccessDeniedException("Not authenticated");
+        }
+
+        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+        User flaUser = userRepository.findByUsername(userDetails.getUsername())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        List<IndentRequest> rejected = indentRequestRepository.findByFlaAndStatus(flaUser, IndentStatus.REJECTED_BY_FLA);
+
+        // Ensure all products in the indent are actually rejected
+        List<IndentRequest> confirmedRejected = rejected.stream()
+                .filter(req -> req.getItems().stream().allMatch(p -> p.getProductStatus() == ProductStatus.REJECTED_BY_FLA))
+                .toList();
+
+        return ResponseEntity.ok(confirmedRejected);
+    }
+    @PostMapping("/fla/review-products")
+    public ResponseEntity<?> reviewProductsByFLA(@RequestBody Map<String, Object> request, Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new AccessDeniedException("Not authenticated");
+        }
+
+        Long indentId = Long.valueOf(request.get("indentId").toString());
         Long slaId = Long.valueOf(request.get("slaId").toString());
 
+        List<Integer> approvedProductIds = (List<Integer>) request.get("approvedProductIds");
+        List<Integer> rejectedProductIds = (List<Integer>) request.get("rejectedProductIds");
+        Map<String, String> remarks = (Map<String, String>) request.get("remarks");
+
         IndentRequest indent = indentRequestRepository.findById(indentId)
                 .orElseThrow(() -> new RuntimeException("Indent not found"));
 
-        if (indent.getStatus() != IndentStatus.PENDING_FLA) {
-            return ResponseEntity.badRequest().body("Indent not in FLA stage");
+        boolean anyApproved = false;
+        boolean anyRejected = false;
+
+        for (IndentProduct product : indent.getItems()) {
+            if (product.getProductStatus() == ProductStatus.PENDING) {
+                if (approvedProductIds.contains(product.getId().intValue())) {
+                    product.setProductStatus(ProductStatus.APPROVED_BY_FLA);
+                    anyApproved = true;
+                } else if (rejectedProductIds.contains(product.getId().intValue())) {
+                    product.setProductStatus(ProductStatus.REJECTED_BY_FLA);
+                    anyRejected = true;
+                }
+                product.setFlaRemarks(remarks.getOrDefault(product.getId().toString(), ""));
+            }
         }
 
-        User slaUser=userRepository.findById(slaId).orElseThrow(()-> new RuntimeException("SLA user not found"));
-        // update status, remark, sla, etc.
-        indent.setRemarkByFla(remark);
-        indent.setSla(userRepository.findById(slaId).orElseThrow(() -> new RuntimeException("SLA not found")));
-        indent.setStatus(IndentStatus.PENDING_SLA);
         indent.setFlaApprovalDate(LocalDateTime.now());
+        indent.setRemarkByFla("Reviewed by FLA");
+
+        if (anyApproved) {
+            indent.setStatus(IndentStatus.PENDING_SLA);
+            indent.setSla(userRepository.findById(slaId).orElseThrow(() -> new RuntimeException("SLA not found")));
+        } else if (anyRejected && !anyApproved) {
+            indent.setStatus(IndentStatus.REJECTED_BY_FLA);
+        }
 
         indentRequestRepository.save(indent);
-        // Send email notification to SLA
-        String emailBody = "Hello " + slaUser.getUsername() + ",\n\n" +
-                "An indent request has been approved by FLA and is now pending your approval.\n" +
-                "Indent ID: " + indentId + "\n" +
-                "Project Name: " + indent.getProjectName() + "\n" +
-                "Item Name: " + indent.getItemName() + "\n" +
-                "Quantity: " + indent.getQuantity() + "\n" +
-                "Per Piece Cost: " + indent.getPerPieceCost() + "\n" +
-                "Department: " + indent.getDepartment() + "\n" +
-                "Description: " + indent.getDescription() + "\n\n" +
-                "Please log in to the system to review the request.\n\n" +
-                "Best regards,\n" +
-                "Your Indent Management System";
-        emailService.sendEmail(slaUser.getEmail(), "Indent Approval Required", emailBody);
-
-        return ResponseEntity.ok(Map.of("message", "Approved and forwarded to SLA"));
+        return ResponseEntity.ok(Map.of("message", "Products reviewed successfully"));
     }
+
+
+
+//    // IndentController.java
+//    @GetMapping("/fla/pending")
+//    public ResponseEntity<?> getPendingIndentsForFLA(Authentication authentication) {
+//        if (authentication == null || !authentication.isAuthenticated()) {
+//            throw new AccessDeniedException("Not authenticated");
+//        }
+//
+//        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+//        String username = userDetails.getUsername();
+//
+//        User flaUser = userRepository.findByUsername(username)
+//                .orElseThrow(() -> new RuntimeException("FLA user not found"));
+//
+//        List<IndentRequest> pendingIndents = indentRequestRepository
+//                .findByFlaAndStatus(flaUser, IndentStatus.PENDING_FLA);
+//
+//        return ResponseEntity.ok(pendingIndents);
+//    }
+//
+//
+//    // IndentController.java
+//    @PostMapping("/fla/approve")
+//    public ResponseEntity<?> approveIndentAsFLA(@RequestBody Map<String, Object> request,
+//                                                Authentication authentication) {
+//        if (authentication == null || !authentication.isAuthenticated()) {
+//            throw new AccessDeniedException("Not authenticated");
+//        }
+//
+//        Long indentId = Long.valueOf(request.get("indentId").toString());
+//        String remark = (String) request.get("remark");
+//        Long slaId = Long.valueOf(request.get("slaId").toString());
+//
+//        IndentRequest indent = indentRequestRepository.findById(indentId)
+//                .orElseThrow(() -> new RuntimeException("Indent not found"));
+//
+//        if (indent.getStatus() != IndentStatus.PENDING_FLA) {
+//            return ResponseEntity.badRequest().body("Indent not in FLA stage");
+//        }
+//
+//        User slaUser=userRepository.findById(slaId).orElseThrow(()-> new RuntimeException("SLA user not found"));
+//        // update status, remark, sla, etc.
+//        indent.setRemarkByFla(remark);
+//        indent.setSla(userRepository.findById(slaId).orElseThrow(() -> new RuntimeException("SLA not found")));
+//        indent.setStatus(IndentStatus.PENDING_SLA);
+//        indent.setFlaApprovalDate(LocalDateTime.now());
+//
+//        indentRequestRepository.save(indent);
+//        // Send email notification to SLA
+//        String emailBody = "Hello " + slaUser.getUsername() + ",\n\n" +
+//                "An indent request has been approved by FLA and is now pending your approval.\n" +
+//                "Indent ID: " + indentId + "\n" +
+//                "Project Name: " + indent.getProjectName() + "\n" +
+//                "Item Name: " + indent.getItemName() + "\n" +
+//                "Quantity: " + indent.getQuantity() + "\n" +
+//                "Per Piece Cost: " + indent.getPerPieceCost() + "\n" +
+//                "Department: " + indent.getDepartment() + "\n" +
+//                "Description: " + indent.getDescription() + "\n\n" +
+//                "Please log in to the system to review the request.\n\n" +
+//                "Best regards,\n" +
+//                "Your Indent Management System";
+//        emailService.sendEmail(slaUser.getEmail(), "Indent Approval Required", emailBody);
+//
+//        return ResponseEntity.ok(Map.of("message", "Approved and forwarded to SLA"));
+//    }
+//
+//
+//    // IndentController.java
+//
+//    @PostMapping("/fla/reject")
+//    public ResponseEntity<?> rejectIndentAsFLA(@RequestBody Map<String, Object> request,
+//                                               Authentication authentication) {
+//        if (authentication == null || !authentication.isAuthenticated()) {
+//            throw new AccessDeniedException("Not authenticated");
+//        }
+//
+//        Long indentId = Long.valueOf(request.get("indentId").toString());
+//        String remark = (String) request.get("remark");
+//
+//        // Get authenticated user
+//        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+//        String username = userDetails.getUsername();
+//
+//        User flaUser = userRepository.findByUsername(username)
+//                .orElseThrow(() -> new RuntimeException("FLA user not found"));
+//
+//        IndentRequest indent = indentRequestRepository.findById(indentId)
+//                .orElseThrow(() -> new RuntimeException("Indent not found"));
+//
+//        // Ensure the indent is in correct stage
+//        if (indent.getStatus() != IndentStatus.PENDING_FLA) {
+//            return ResponseEntity.badRequest().body("Indent not in FLA stage");
+//        }
+//
+//        // Perform rejection
+//        indent.setRemarkByFla(remark);
+//        indent.setStatus(IndentStatus.REJECTED_BY_FLA);
+//        indent.setFlaApprovalDate(LocalDateTime.now());
+//
+//        indentRequestRepository.save(indent);
+//        System.err.println("before rejectiopn");
+//        emailrejectedindent("FLA", indent, indentId);
+//        System.err.println("after rejectiopn");
+//
+//
+//
+//
+//        return ResponseEntity.ok(Map.of("message", "Indent rejected by FLA"));
+//    }
+
+
+
 
 
     // IndentController.java
-
-    @PostMapping("/fla/reject")
-    public ResponseEntity<?> rejectIndentAsFLA(@RequestBody Map<String, Object> request,
-                                               Authentication authentication) {
-        if (authentication == null || !authentication.isAuthenticated()) {
-            throw new AccessDeniedException("Not authenticated");
-        }
-
-        Long indentId = Long.valueOf(request.get("indentId").toString());
-        String remark = (String) request.get("remark");
-
-        // Get authenticated user
-        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
-        String username = userDetails.getUsername();
-
-        User flaUser = userRepository.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("FLA user not found"));
-
-        IndentRequest indent = indentRequestRepository.findById(indentId)
-                .orElseThrow(() -> new RuntimeException("Indent not found"));
-
-        // Ensure the indent is in correct stage
-        if (indent.getStatus() != IndentStatus.PENDING_FLA) {
-            return ResponseEntity.badRequest().body("Indent not in FLA stage");
-        }
-
-        // Perform rejection
-        indent.setRemarkByFla(remark);
-        indent.setStatus(IndentStatus.REJECTED_BY_FLA);
-        indent.setFlaApprovalDate(LocalDateTime.now());
-
-        indentRequestRepository.save(indent);
-        System.err.println("before rejectiopn");
-        emailrejectedindent("FLA", indent, indentId);
-        System.err.println("after rejectiopn");
-
-
-
-
-        return ResponseEntity.ok(Map.of("message", "Indent rejected by FLA"));
-    }
+    // IndentController.java
+//    @PostMapping("/sla/approve")
+//    public ResponseEntity<?> approveIndentAsSLA(@RequestBody Map<String, Object> request,
+//                                                Authentication authentication) {
+//        if (authentication == null || !authentication.isAuthenticated()) {
+//            throw new AccessDeniedException("Not authenticated");
+//        }
+//        Long indentId = Long.valueOf(request.get("indentId").toString());
+//        String remark = (String) request.get("remark");
+//
+//
+//        // Fetch the indent request
+//        IndentRequest indent = indentRequestRepository.findById(indentId)
+//                .orElseThrow(() -> new RuntimeException("Indent not found"));
+//
+//        if (indent.getStatus() != IndentStatus.PENDING_SLA) {
+//            return ResponseEntity.badRequest().body("Indent not in SLA stage");
+//        }
+//
+//        // Set SLA's remark
+//        indent.setRemarkBySla(remark);
+//        indent.setStatus(IndentStatus.PENDING_STORE);  // Move to Store stage
+//        indent.setSlaApprovalDate(LocalDateTime.now());
+//
+//        // Assign Store (Saurav) directly (userId = 12)
+//        User storeUser = userRepository.findById(2L)
+//                .orElseThrow(() -> new RuntimeException("Store user not found"));
+//        indent.setStore(storeUser);  // Assign Saurav as the store user
+//
+//        // Save the updated indent request
+//        indentRequestRepository.save(indent);
+//
+//
+//        String emailBody = "Hello " + "Store User" + ",\n\n" +
+//                "An indent request has been approved by SLA and is now pending your approval.\n" +
+//                "Indent ID: " + indentId + "\n" +
+//                "Project Name: " + indent.getProjectName() + "\n" +
+//                "Item Name: " + indent.getItemName() + "\n" +
+//                "Quantity: " + indent.getQuantity() + "\n" +
+//                "Per Piece Cost: " + indent.getPerPieceCost() + "\n" +
+//                "Department: " + indent.getDepartment() + "\n" +
+//                "Description: " + indent.getDescription() + "\n\n" +
+//                "Please log in to the system to review the request.\n\n" +
+//                "Best regards,\n" +
+//                "Your Indent Management System";
+//        emailService.sendEmail("storeuser@gmail.com", "Indent Approval Required", emailBody);
+//
+//        return ResponseEntity.ok(Map.of("message", "Approved and forwarded to Store"));
+//    }
+//
+//
+//    @PostMapping("/sla/reject")
+//    public ResponseEntity<?> rejectIndentAsSLA(@RequestBody Map<String, Object> request,
+//                                               Authentication authentication) {
+//        if (authentication == null || !authentication.isAuthenticated()) {
+//            throw new AccessDeniedException("Not authenticated");
+//        }
+//
+//        Long indentId = Long.valueOf(request.get("indentId").toString());
+//        String remark = (String) request.get("remark");
+//
+//        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+//        String username = userDetails.getUsername();
+//
+//        User slaUser = userRepository.findByUsername(username)
+//                .orElseThrow(() -> new RuntimeException("SLA user not found"));
+//
+//        IndentRequest indent = indentRequestRepository.findById(indentId)
+//                .orElseThrow(() -> new RuntimeException("Indent not found"));
+//
+//        if (indent.getStatus() != IndentStatus.PENDING_SLA) {
+//            return ResponseEntity.badRequest().body("Indent not in SLA stage");
+//        }
+//
+//        indent.setRemarkBySla(remark);
+//        indent.setStatus(IndentStatus.REJECTED_BY_SLA);
+//        indent.setSlaApprovalDate(LocalDateTime.now());
+//
+//        indentRequestRepository.save(indent);
+//        emailrejectedindent("SLA", indent, indentId);
+//        return ResponseEntity.ok(Map.of("message", "Indent rejected by SLA"));
+//    }
 
 
     // IndentController.java
@@ -573,139 +583,97 @@ public ResponseEntity<?> createMultipleIndents(@Valid @RequestBody Map<String, O
 
         return ResponseEntity.ok(pendingIndents);
     }
-
-
-    // IndentController.java
-    // IndentController.java
-    @PostMapping("/sla/approve")
-    public ResponseEntity<?> approveIndentAsSLA(@RequestBody Map<String, Object> request,
-                                                Authentication authentication) {
+    @PostMapping("/sla/review-products")
+    public ResponseEntity<?> reviewProductsBySLA(@RequestBody Map<String, Object> request, Authentication authentication) {
         if (authentication == null || !authentication.isAuthenticated()) {
             throw new AccessDeniedException("Not authenticated");
         }
+
         Long indentId = Long.valueOf(request.get("indentId").toString());
-        String remark = (String) request.get("remark");
+        List<Integer> approvedProductIds = (List<Integer>) request.get("approvedProductIds");
+        List<Integer> rejectedProductIds = (List<Integer>) request.get("rejectedProductIds");
+        Map<String, String> remarks = (Map<String, String>) request.get("remarks");
 
-
-        // Fetch the indent request
         IndentRequest indent = indentRequestRepository.findById(indentId)
                 .orElseThrow(() -> new RuntimeException("Indent not found"));
 
-        if (indent.getStatus() != IndentStatus.PENDING_SLA) {
-            return ResponseEntity.badRequest().body("Indent not in SLA stage");
+        boolean anyApproved = false;
+        boolean anyRejected = false;
+
+        for (IndentProduct product : indent.getItems()) {
+            if (product.getProductStatus() == ProductStatus.APPROVED_BY_FLA) {
+                if (approvedProductIds.contains(product.getId().intValue())) {
+                    product.setProductStatus(ProductStatus.APPROVED_BY_SLA);
+                    anyApproved = true;
+                } else if (rejectedProductIds.contains(product.getId().intValue())) {
+                    product.setProductStatus(ProductStatus.REJECTED_BY_SLA);
+                    anyRejected = true;
+                }
+                product.setSlaRemarks(remarks.getOrDefault(product.getId().toString(), ""));
+            }
         }
 
-        // Set SLA's remark
-        indent.setRemarkBySla(remark);
-        indent.setStatus(IndentStatus.PENDING_STORE);  // Move to Store stage
         indent.setSlaApprovalDate(LocalDateTime.now());
+        indent.setRemarkBySla("Reviewed by SLA");
 
-        // Assign Store (Saurav) directly (userId = 12)
-        User storeUser = userRepository.findById(2L)
-                .orElseThrow(() -> new RuntimeException("Store user not found"));
-        indent.setStore(storeUser);  // Assign Saurav as the store user
-
-        // Save the updated indent request
-        indentRequestRepository.save(indent);
-
-
-        String emailBody = "Hello " + "Store User" + ",\n\n" +
-                "An indent request has been approved by SLA and is now pending your approval.\n" +
-                "Indent ID: " + indentId + "\n" +
-                "Project Name: " + indent.getProjectName() + "\n" +
-                "Item Name: " + indent.getItemName() + "\n" +
-                "Quantity: " + indent.getQuantity() + "\n" +
-                "Per Piece Cost: " + indent.getPerPieceCost() + "\n" +
-                "Department: " + indent.getDepartment() + "\n" +
-                "Description: " + indent.getDescription() + "\n\n" +
-                "Please log in to the system to review the request.\n\n" +
-                "Best regards,\n" +
-                "Your Indent Management System";
-        emailService.sendEmail("storeuser@gmail.com", "Indent Approval Required", emailBody);
-
-        return ResponseEntity.ok(Map.of("message", "Approved and forwarded to Store"));
-    }
-
-
-    @PostMapping("/sla/reject")
-    public ResponseEntity<?> rejectIndentAsSLA(@RequestBody Map<String, Object> request,
-                                               Authentication authentication) {
-        if (authentication == null || !authentication.isAuthenticated()) {
-            throw new AccessDeniedException("Not authenticated");
+        if (anyApproved) {
+            indent.setStatus(IndentStatus.PENDING_STORE);
+            indent.setStore(userRepository.findById(2L) // Your store user ID
+                    .orElseThrow(() -> new RuntimeException("Store user not found")));
+        } else if (anyRejected && !anyApproved) {
+            indent.setStatus(IndentStatus.REJECTED_BY_SLA);
         }
 
-        Long indentId = Long.valueOf(request.get("indentId").toString());
-        String remark = (String) request.get("remark");
-
-        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
-        String username = userDetails.getUsername();
-
-        User slaUser = userRepository.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("SLA user not found"));
-
-        IndentRequest indent = indentRequestRepository.findById(indentId)
-                .orElseThrow(() -> new RuntimeException("Indent not found"));
-
-        if (indent.getStatus() != IndentStatus.PENDING_SLA) {
-            return ResponseEntity.badRequest().body("Indent not in SLA stage");
-        }
-
-        indent.setRemarkBySla(remark);
-        indent.setStatus(IndentStatus.REJECTED_BY_SLA);
-        indent.setSlaApprovalDate(LocalDateTime.now());
-
         indentRequestRepository.save(indent);
-        emailrejectedindent("SLA", indent, indentId);
-        return ResponseEntity.ok(Map.of("message", "Indent rejected by SLA"));
+        return ResponseEntity.ok(Map.of("message", "Products reviewed successfully"));
     }
-
 
     // IndentController.java
-    @PostMapping("/store/approve")
-    public ResponseEntity<?> approveIndentAsStore(@RequestBody Map<String, Object> request,
-                                                  Authentication authentication) {
-        if (authentication == null || !authentication.isAuthenticated()) {
-            throw new AccessDeniedException("Not authenticated");
-        }
-
-        Long indentId = Long.valueOf(request.get("indentId").toString());
-        String remark = (String) request.get("remark");
-
-        // Fetch the indent request
-        IndentRequest indent = indentRequestRepository.findById(indentId)
-                .orElseThrow(() -> new RuntimeException("Indent not found"));
-
-        if (indent.getStatus() != IndentStatus.PENDING_STORE) {
-            return ResponseEntity.badRequest().body("Indent not in Store stage");
-        }
-
-        // Set Store's remark and change status to Finance stage
-        indent.setRemarkByStore(remark);
-        indent.setStatus(IndentStatus.PENDING_FINANCE);  // Move to Finance stage
-        indent.setStoreApprovalDate(LocalDateTime.now());
-
-        // Save the updated indent request
-        indentRequestRepository.save(indent);
-
-        String emailBody = "Hello " + "Finance Department" + ",\n\n" +
-                "An indent request has been approved by Store and is now pending your approval.\n" +
-                "Indent ID: " + indentId + "\n" +
-                "Project Name: " + indent.getProjectName() + "\n" +
-                "Item Name: " + indent.getItemName() + "\n" +
-                "Quantity: " + indent.getQuantity() + "\n" +
-                "Per Piece Cost: " + indent.getPerPieceCost() + "\n" +
-                "Department: " + indent.getDepartment() + "\n" +
-                "Description: " + indent.getDescription() + "\n\n" +
-                "Please log in to the system to review the request.\n\n" +
-                "Best regards,\n" +
-                "Your Indent Management System";
-        emailService.sendEmail("financeDepartment@gmail.com", "Indent Approval Required", emailBody);
-
-        return ResponseEntity.ok(Map.of("message", "Approved and forwarded to Finance"));
-    }
-
-
-    // IndentController.java
+//    @PostMapping("/store/approve")
+//    public ResponseEntity<?> approveIndentAsStore(@RequestBody Map<String, Object> request,
+//                                                  Authentication authentication) {
+//        if (authentication == null || !authentication.isAuthenticated()) {
+//            throw new AccessDeniedException("Not authenticated");
+//        }
+//
+//        Long indentId = Long.valueOf(request.get("indentId").toString());
+//        String remark = (String) request.get("remark");
+//
+//        // Fetch the indent request
+//        IndentRequest indent = indentRequestRepository.findById(indentId)
+//                .orElseThrow(() -> new RuntimeException("Indent not found"));
+//
+//        if (indent.getStatus() != IndentStatus.PENDING_STORE) {
+//            return ResponseEntity.badRequest().body("Indent not in Store stage");
+//        }
+//
+//        // Set Store's remark and change status to Finance stage
+//        indent.setRemarkByStore(remark);
+//        indent.setStatus(IndentStatus.PENDING_FINANCE);  // Move to Finance stage
+//        indent.setStoreApprovalDate(LocalDateTime.now());
+//
+//        // Save the updated indent request
+//        indentRequestRepository.save(indent);
+//
+//        String emailBody = "Hello " + "Finance Department" + ",\n\n" +
+//                "An indent request has been approved by Store and is now pending your approval.\n" +
+//                "Indent ID: " + indentId + "\n" +
+//                "Project Name: " + indent.getProjectName() + "\n" +
+//                "Item Name: " + indent.getItemName() + "\n" +
+//                "Quantity: " + indent.getQuantity() + "\n" +
+//                "Per Piece Cost: " + indent.getPerPieceCost() + "\n" +
+//                "Department: " + indent.getDepartment() + "\n" +
+//                "Description: " + indent.getDescription() + "\n\n" +
+//                "Please log in to the system to review the request.\n\n" +
+//                "Best regards,\n" +
+//                "Your Indent Management System";
+//        emailService.sendEmail("financeDepartment@gmail.com", "Indent Approval Required", emailBody);
+//
+//        return ResponseEntity.ok(Map.of("message", "Approved and forwarded to Finance"));
+//    }
+//
+//
+//    // IndentController.java
     @GetMapping("/store/pending")
     public ResponseEntity<?> getPendingIndentsForStore(Authentication authentication) {
         if (authentication == null || !authentication.isAuthenticated()) {
@@ -736,35 +704,123 @@ public ResponseEntity<?> createMultipleIndents(@Valid @RequestBody Map<String, O
                 ))
                 .collect(Collectors.toList());
 
-        return ResponseEntity.ok(indentDTOs);
+        return ResponseEntity.ok(pendingIndents);
     }
+//
+//
+//    @PostMapping("/store/reject")
+//    public ResponseEntity<?> rejectIndentAsStore(@RequestBody Map<String, Object> request,
+//                                                 Authentication authentication) {
+//        if (authentication == null || !authentication.isAuthenticated()) {
+//            throw new AccessDeniedException("Not authenticated");
+//        }
+//
+//        Long indentId = Long.valueOf(request.get("indentId").toString());
+//        String remark = (String) request.get("remark");
+//
+//        IndentRequest indent = indentRequestRepository.findById(indentId)
+//                .orElseThrow(() -> new RuntimeException("Indent not found"));
+//
+//        if (indent.getStatus() != IndentStatus.PENDING_STORE) {
+//            return ResponseEntity.badRequest().body("Indent not in Store stage");
+//        }
+//
+//        indent.setRemarkByStore(remark);
+//        indent.setStatus(IndentStatus.REJECTED_BY_STORE);
+//        indent.setStoreApprovalDate(LocalDateTime.now());
+//
+//        indentRequestRepository.save(indent);
+//        emailrejectedindent("Store", indent, indentId);
+//        return ResponseEntity.ok(Map.of("message", "Indent rejected by Store"));
+//    }
 
 
-    @PostMapping("/store/reject")
-    public ResponseEntity<?> rejectIndentAsStore(@RequestBody Map<String, Object> request,
-                                                 Authentication authentication) {
+//    @GetMapping("/store/pending")
+//    public ResponseEntity<?> getPendingIndentsForStore(Authentication authentication) {
+//        if (authentication == null || !authentication.isAuthenticated()) {
+//            throw new AccessDeniedException("Not authenticated");
+//        }
+//
+//        List<IndentRequest> pendingIndents = indentRequestRepository.findByStatus(IndentStatus.PENDING_STORE);
+//
+//        if (pendingIndents.isEmpty()) {
+//            return ResponseEntity.noContent().build();
+//        }
+//
+//        List<IndentRequestDTO> indentDTOs = pendingIndents.stream()
+//                .map(indent -> new IndentRequestDTO(
+//                        indent.getId(),
+//                        indent.getItemName(),
+//                        indent.getQuantity(),
+//                        indent.getPerPieceCost(),
+//                        indent.getDescription(),
+//                        indent.getFla() != null ? indent.getFla().getUsername() : null,
+//                        indent.getSla() != null ? indent.getSla().getUsername() : null,
+//                        indent.getRemarkBySla(),
+//                        indent.getStatus().name()
+//                ))
+//                .collect(Collectors.toList());
+//
+//        return ResponseEntity.ok(indentDTOs);
+//    }
+
+
+    @PostMapping("/store/review-products")
+    public ResponseEntity<?> reviewProductsByStore(@RequestBody Map<String, Object> request,
+                                                   Authentication authentication) {
+
         if (authentication == null || !authentication.isAuthenticated()) {
             throw new AccessDeniedException("Not authenticated");
         }
 
         Long indentId = Long.valueOf(request.get("indentId").toString());
-        String remark = (String) request.get("remark");
+        System.err.println("Store review endpoint hit for indentId = " + indentId);
+
+        List<Integer> approvedProductIds = (List<Integer>) request.get("approvedProductIds");
+        List<Integer> rejectedProductIds = (List<Integer>) request.get("rejectedProductIds");
+        Map<String, String> remarks = (Map<String, String>) request.get("remarks");
 
         IndentRequest indent = indentRequestRepository.findById(indentId)
                 .orElseThrow(() -> new RuntimeException("Indent not found"));
 
-        if (indent.getStatus() != IndentStatus.PENDING_STORE) {
-            return ResponseEntity.badRequest().body("Indent not in Store stage");
+        boolean anyApproved = false;
+        boolean anyRejected = false;
+
+        for (IndentProduct product : indent.getItems()) {
+            System.err.println("Checking product ID: " + product.getId() + ", status: " + product.getProductStatus());
+            if (product.getProductStatus() == ProductStatus.APPROVED_BY_SLA) {
+                if (approvedProductIds.contains(product.getId().intValue())) {
+                    System.err.println("Product " + product.getId() + " approved");
+                    product.setProductStatus(ProductStatus.APPROVED_BY_STORE);
+                    anyApproved = true;
+                } else if (rejectedProductIds.contains(product.getId().intValue())) {
+                    System.err.println("Product " + product.getId() + " rejected");
+                    product.setProductStatus(ProductStatus.REJECTED_BY_STORE);
+                    anyRejected = true;
+                }
+                product.setStoreRemarks(remarks.getOrDefault(product.getId().toString(), ""));
+            }
         }
 
-        indent.setRemarkByStore(remark);
-        indent.setStatus(IndentStatus.REJECTED_BY_STORE);
         indent.setStoreApprovalDate(LocalDateTime.now());
+        indent.setRemarkByStore("Reviewed by Store");
+
+        if (anyApproved) {
+            System.err.println("inside approved ");
+            indent.setStatus(IndentStatus.PENDING_FINANCE);
+            // Optionally assign to Finance role if needed
+        } else if (anyRejected && !anyApproved) {
+            System.err.println("inside rejected ");
+            indent.setStatus(IndentStatus.REJECTED_BY_STORE);
+        }
 
         indentRequestRepository.save(indent);
-        emailrejectedindent("Store", indent, indentId);
-        return ResponseEntity.ok(Map.of("message", "Indent rejected by Store"));
+        return ResponseEntity.ok(Map.of("message", "Store review completed successfully"));
     }
+
+
+
+
 
 
     @GetMapping("/finance/pending")

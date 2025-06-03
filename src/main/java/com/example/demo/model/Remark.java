@@ -22,7 +22,7 @@ public class Remark {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "indent_id")
-    @JsonBackReference
+    @JsonBackReference("indent-remarks")
     private IndentRequest indentRequest;
 
     // Constructors
