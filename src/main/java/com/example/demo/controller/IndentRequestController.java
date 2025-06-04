@@ -1072,7 +1072,6 @@ public ResponseEntity<?> createIndent(
         }
 
         String remark = requestBody.get("remark");
-
         indent.setStatus(IndentStatus.PENDING_PURCHASE_GFR);
         indent.setUserInspectionDate(LocalDateTime.now());
         indent.setRemarkByUser(remark);
