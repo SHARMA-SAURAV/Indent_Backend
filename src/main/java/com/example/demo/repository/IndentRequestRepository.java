@@ -37,6 +37,10 @@ public interface IndentRequestRepository extends JpaRepository<IndentRequest, Lo
 
     @Query("SELECT ir FROM IndentRequest ir JOIN FETCH ir.requestedBy")
     List<IndentRequest> findAllWithUser();
+
+ @Query("SELECT i FROM IndentRequest i WHERE i.store.id = :storeId")
+ List<IndentRequest> findByStoreId(@Param("storeId") Long storeId);
+
  List<IndentRequest> findByCategory(String category);
 
  List<IndentRequest> findByCategoryAndStatus(String category, IndentStatus status);

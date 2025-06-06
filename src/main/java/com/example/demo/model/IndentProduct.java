@@ -63,19 +63,19 @@ private String specification;
 
     @Column(columnDefinition = "TEXT")
     private String flaRemarks;
-
+    private LocalDateTime flaRemarksDate;
     @Column(columnDefinition = "TEXT")
     private String slaRemarks;
-
+    private LocalDateTime slaRemarksDate;
     @Column(columnDefinition = "TEXT")
     private String storeRemarks;
-
+    private  LocalDateTime storeRemarksDate;
     @Column(columnDefinition = "TEXT")
     private String financeRemarks;
-
+    private LocalDateTime financeReamrksDate;
     @Column(columnDefinition = "TEXT")
     private String purchaseRemarks;
-
+    private LocalDateTime purchaseRemarkDate;
     // ===== AUDIT FIELDS =====
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

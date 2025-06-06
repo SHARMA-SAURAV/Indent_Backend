@@ -30,7 +30,6 @@ public class TrackerController {
     public ResponseEntity<?> getAllIndentsForFLA(Authentication authentication) {
         if (authentication == null || !authentication.isAuthenticated()) {
             throw new AccessDeniedException("Not authenticated");
-
         }
         UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
         String username = userDetails.getUsername();
@@ -59,13 +58,19 @@ public class TrackerController {
     public ResponseEntity<?> getAllIndentsForStore(Authentication authentication) {
         if (authentication == null || !authentication.isAuthenticated()) {
             throw new AccessDeniedException("Not authenticated");
-
         }
         UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
         String username = userDetails.getUsername();
         User storeuser = userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("Store user not found"));
-        List<IndentRequest> assignedIndents = indentRequestRepository.findByStore(storeuser);
+//        List<IndentRequest> assignedIndents = indentRequestRepository.findByStore(storeuser);
+        System.err.println("store user ID"+storeuser.getId());
+        System.err.println("store "+storeuser);
+
+
+
+        List<IndentRequest> assignedIndents = indentRequestRepository.findByStoreId((long) storeuser.getId());
+
         return ResponseEntity.ok(assignedIndents);
     }
 
