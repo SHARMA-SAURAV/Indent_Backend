@@ -198,6 +198,13 @@ public class IndentRequest {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    // for project reference
+    @ManyToOne
+    @JoinColumn(name = "project_id", nullable = false)
+    private Project project; // Reference to the project this indent belongs to
+    @Enumerated(EnumType.STRING)
+    private ProjectHeadType projectHead; // Type of project head (Capital, Consumable, Category, Overhead)
+
     // ===== INDENT LEVEL FIELDS =====
     @Column(unique = true)
     private String indentNumber; // Unique identifier for the entire indent

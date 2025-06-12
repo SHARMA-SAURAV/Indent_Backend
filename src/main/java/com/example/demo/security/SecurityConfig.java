@@ -68,6 +68,7 @@ public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Excepti
                     .requestMatchers("/api/auth/users/by-role").permitAll() // ✅ Correct pattern
                     .requestMatchers("/api/indent/create").authenticated()
                     .requestMatchers("/api/auth/me").authenticated()
+                    .requestMatchers("/api/project/**").authenticated()
                     .requestMatchers("/api/indent/fla/pending").authenticated() //  No path variable
                     .requestMatchers("/api/indent/fla/approve").authenticated() // No path variable
                     .requestMatchers("/api/indent/sla/approve").authenticated() //  No path variable

@@ -2,33 +2,41 @@ package com.example.demo.model;
 
 public enum IndentStatus {
 
-    PENDING_SLA,    // SLA assigned, waiting for approval
-    FINANCE_REVIEW, // Finance reviewed, sent to Purchase
-    PURCHASE_REVIEW,// Purchase reviewed, indent completed
-    COMPLETED,
+    PENDING_FLA,
+    REJECTED_BY_FLA,
+    PENDING_SLA,
+    REJECTED_BY_SLA,
+    PENDING_STORE,
+    REJECTED_BY_STORE,
     PENDING_FINANCE,
     REJECTED_BY_FINANCE,
     PENDING_PURCHASE,
-    DELIVERED, UNDER_INSPECTION, GFR_GENERATED,WAITING_FOR_USER_CONFIRMATION,
-    REJECTED_BY_FLA,
     PURCHASE_REJECTED,
+    WAITING_FOR_USER_CONFIRMATION,
+    PENDING_PURCHASE_GFR,
+    PENDING_FINANCE_PAYMENT,
+    PAYMENT_COMPLETED,
+    FINANCE_REVIEW, // Finance reviewed, sent to Purchase
+    PURCHASE_REVIEW,// Purchase reviewed, indent completed
+    COMPLETED,
+
+    DELIVERED, UNDER_INSPECTION, GFR_GENERATED,
+
+
     AWAITING_USER_INSPECTION,
     USER_APPROVED,
     PAYMENT_REJECTED,
-    PENDING_FINANCE_PAYMENT,
-    PENDING_PURCHASE_GFR,
-    REJECTED_BY_SLA,
-    PAYMENT_COMPLETED,
-    REJECTED_BY_STORE,
+
+
     SUCCESS,
 //    PENDING_FLA,
 //    PENDING_SLA,
 //    PENDING_STORE,
 
-//    PENDING_PURCHASE,
+    //    PENDING_PURCHASE,
     PURCHASE_PROCESSING,
-//    WAITING_FOR_USER_CONFIRMATION,
+    //    WAITING_FOR_USER_CONFIRMATION,
     INWARD_PENDING,
     READY_FOR_INSPECTION,
-    PENDING_STORE, PENDING_FLA       // Rejected at any stage
+    // Rejected at any stage      // Rejected at any stage
 }

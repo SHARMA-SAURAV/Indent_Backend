@@ -48,6 +48,7 @@ private String specification;
     // ===== FILE ATTACHMENTS =====
     private String fileName;
     private String fileUrl;
+    private String attachmentPath;
     private String fileType;
     private Long fileSize;
     private LocalDateTime fileUploadedAt;

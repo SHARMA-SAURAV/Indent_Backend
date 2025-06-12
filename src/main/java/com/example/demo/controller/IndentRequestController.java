@@ -4,6 +4,7 @@ import com.example.demo.dto.IndentRequestDTO;
 import com.example.demo.mapper.IndentRequestMapper;
 import com.example.demo.model.*;
 import com.example.demo.repository.IndentRequestRepository;
+import com.example.demo.repository.ProjectRepository;
 import com.example.demo.repository.PurchaseReviewRepository;
 import com.example.demo.repository.UserRepository;
 import com.example.demo.security.UserDetailsImpl;
@@ -26,7 +27,9 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.net.MalformedURLException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -45,12 +48,14 @@ public class IndentRequestController {
     private  final UserRepository userRepository;
     private final EmailService emailService;
     private final PurchaseReviewRepository purchaseReviewRepository;
-    public IndentRequestController(IndentRequestService indentRequestService,UserRepository userRepository, PurchaseReviewRepository purchaseReviewRepository,IndentRequestRepository indentRequestRepository, EmailService emailService) {
+    private final ProjectRepository projectRepository;
+    public IndentRequestController(IndentRequestService indentRequestService,ProjectRepository projectRepository,UserRepository userRepository, PurchaseReviewRepository purchaseReviewRepository,IndentRequestRepository indentRequestRepository, EmailService emailService) {
         this.indentRequestService = indentRequestService;
         this.userRepository= userRepository;
         this.indentRequestRepository = indentRequestRepository;
         this.emailService=emailService;
         this.purchaseReviewRepository = purchaseReviewRepository;
+        this.projectRepository = projectRepository;
     }
     public  void emailrejectedindent(String role, IndentRequest indent, Long indentId){
         User user =indent.getRequestedBy();
@@ -75,69 +80,201 @@ public class IndentRequestController {
         }
     }
 
-@PostMapping(value = "/create", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-public ResponseEntity<?> createIndent(
-        @RequestPart("indentData") String indentData,
-        @RequestPart(value = "file", required = false) MultipartFile file,
-        Authentication auth
-) throws IOException {
+//@PostMapping(value = "/create", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+//public ResponseEntity<?> createIndent(
+//        @RequestPart("indentData") String indentData,
+//        @RequestPart(value = "file", required = false) MultipartFile file,
+//        Authentication auth
+//) throws IOException {
+//
+//    if (auth == null || !auth.isAuthenticated()) {
+//        throw new AccessDeniedException("Not authenticated");
+//    }
+//
+//    UserDetailsImpl userDetails = (UserDetailsImpl) auth.getPrincipal();
+//    User user = userRepository.findByUsername(userDetails.getUsername())
+//            .orElseThrow(() -> new RuntimeException("User not found"));
+//
+//    // Use ObjectNode to extract fields manually
+//    ObjectMapper objectMapper = new ObjectMapper();
+//    JsonNode root = objectMapper.readTree(indentData);
+//
+//    String recipientType = root.get("recipientType").asText();  // ✅ FLA or SLA
+//    Long recipientId = root.get("recipientId").asLong();
+//    Long projectId = root.get("projectId").asLong(); // Assuming projectId is present
+//    String head=root.get("projectHead").asText(); // Assuming projectHead is present
+//
+//    // Remove extra fields before mapping to IndentRequest
+//    ((ObjectNode) root).remove("recipientType");
+//    ((ObjectNode) root).remove("recipientId");
+//    ((ObjectNode) root).remove("projectId");
+//    ((ObjectNode) root).remove("projectHead");
+//
+//    // Deserialize clean JSON to IndentRequest
+//    IndentRequest indentRequest = objectMapper.treeToValue(root, IndentRequest.class);
+//
+//    indentRequest.setRequestedBy(user);
+//    indentRequest.setCreatedAt(LocalDateTime.now());
+//    indentRequest.setStatus(IndentStatus.PENDING_FLA); // or handle dynamically later
+//    Project project =projectRespository.findById(projectId)
+//            .orElseThrow(() -> new RuntimeException("Project not found"));
+//    indentRequest.setProject(project);
+//try{
+//    indentRequest.setProjectHead(ProjectHeadType.valueOf(head.toUpperCase()));
+//}
+//catch (IllegalArgumentException e) {
+//    throw new RuntimeException("Invalid project head type: " + head);
+//}
+//    // Link products
+//    for (IndentProduct item : indentRequest.getItems()) {
+//        item.setIndentRequest(indentRequest);
+//    }
+//
+//    // Save file to disk if file is present
+//    if (file != null && !file.isEmpty()) {
+//        String uploadDir = "uploads/";
+//        String fileName = UUID.randomUUID() + "_" + file.getOriginalFilename();
+//        Path path = Paths.get(uploadDir + fileName);
+//        Files.createDirectories(path.getParent());
+//        Files.write(path, file.getBytes());
+//        indentRequest.setAttachmentPath(fileName);
+//    }
+//
+//    // TODO: Based on recipientType and recipientId set FLA or SLA
+//    if ("FLA".equalsIgnoreCase(recipientType)) {
+//        User fla = userRepository.findById(recipientId).orElseThrow(() -> new RuntimeException("FLA not found"));
+//        indentRequest.setFla(fla);
+//        indentRequest.setStatus(IndentStatus.PENDING_FLA);
+//    } else if ("SLA".equalsIgnoreCase(recipientType)) {
+//        User sla = userRepository.findById(recipientId).orElseThrow(() -> new RuntimeException("SLA not found"));
+//        indentRequest.setSla(sla);
+//        indentRequest.setStatus(IndentStatus.PENDING_SLA); // Skip FLA directly
+//    }
+//
+//    IndentRequest saved = indentRequestRepository.save(indentRequest);
+//
+//    return ResponseEntity.ok(saved);
+//}
 
-    if (auth == null || !auth.isAuthenticated()) {
-        throw new AccessDeniedException("Not authenticated");
+
+
+
+
+
+
+
+    @PostMapping(value = "/create", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> createIndent(
+            @RequestPart("indentData") String indentData,
+            @RequestPart(value = "files", required = false) List<MultipartFile> files,
+            Authentication auth
+    ) throws IOException {
+        if (auth == null || !auth.isAuthenticated()) {
+            throw new AccessDeniedException("Not authenticated");
+        }
+
+        UserDetailsImpl userDetails = (UserDetailsImpl) auth.getPrincipal();
+        User user = userRepository.findByUsername(userDetails.getUsername())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        ObjectMapper objectMapper = new ObjectMapper();
+        JsonNode root = objectMapper.readTree(indentData);
+
+        String recipientType = root.get("recipientType").asText();
+        Long recipientId = root.get("recipientId").asLong();
+        Long projectId = root.get("projectId").asLong();
+        String head = root.get("projectHead").asText().toUpperCase();
+
+        ((ObjectNode) root).remove("recipientType");
+        ((ObjectNode) root).remove("recipientId");
+        ((ObjectNode) root).remove("projectId");
+        ((ObjectNode) root).remove("projectHead");
+
+        IndentRequest indentRequest = objectMapper.treeToValue(root, IndentRequest.class);
+        indentRequest.setRequestedBy(user);
+        indentRequest.setCreatedAt(LocalDateTime.now());
+
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new RuntimeException("Project not found"));
+
+        ProjectHeadType headType;
+        try {
+            headType = ProjectHeadType.valueOf(head);
+            indentRequest.setProjectHead(headType);
+        } catch (IllegalArgumentException e) {
+            throw new RuntimeException("Invalid project head: " + head);
+        }
+
+        indentRequest.setProject(project);
+
+        List<IndentProduct> items = indentRequest.getItems();
+        double totalAmount = 0;
+        for (int i = 0; i < items.size(); i++) {
+            IndentProduct item = items.get(i);
+            item.setIndentRequest(indentRequest);
+            item.calculateTotalCost(); // ensure totalCost is set
+            item.storeOriginalValues();
+
+            // Attach file to this item if available
+            if (files != null && i < files.size() && !files.get(i).isEmpty()) {
+                MultipartFile itemFile = files.get(i);
+                String uploadDir = "uploads/products/";
+                String fileName = UUID.randomUUID() + "_" + itemFile.getOriginalFilename();
+                Path path = Paths.get(uploadDir + fileName);
+                Files.createDirectories(path.getParent());
+                Files.write(path, itemFile.getBytes());
+
+                item.setAttachmentPath(fileName);
+                item.setFileName(itemFile.getOriginalFilename());
+                item.setFileSize(itemFile.getSize());
+                item.setFileType(itemFile.getContentType());
+                item.setFileUploadedAt(LocalDateTime.now());
+            }
+
+            totalAmount += item.getTotalCost();
+        }
+
+        boolean overBudget = false;
+        switch (headType) {
+            case CAPITAL -> {
+                project.setCapitalAmount(project.getCapitalAmount() - totalAmount);
+                overBudget = project.getCapitalAmount() < 0;
+            }
+            case CONSUMABLE -> {
+                project.setConsumableAmount(project.getConsumableAmount() - totalAmount);
+                overBudget = project.getConsumableAmount() < 0;
+            }
+            case CATEGORY -> {
+                project.setCategoryAmount(project.getCategoryAmount() - totalAmount);
+                overBudget = project.getCategoryAmount() < 0;
+            }
+            case OVERHEAD -> {
+                project.setOverheadAmount(project.getOverheadAmount() - totalAmount);
+                overBudget = project.getOverheadAmount() < 0;
+            }
+        }
+
+        if ("FLA".equalsIgnoreCase(recipientType)) {
+            User fla = userRepository.findById(recipientId).orElseThrow(() -> new RuntimeException("FLA not found"));
+            indentRequest.setFla(fla);
+            indentRequest.setStatus(IndentStatus.PENDING_FLA);
+        } else if ("SLA".equalsIgnoreCase(recipientType)) {
+            User sla = userRepository.findById(recipientId).orElseThrow(() -> new RuntimeException("SLA not found"));
+            indentRequest.setSla(sla);
+            indentRequest.setStatus(IndentStatus.PENDING_SLA);
+        }
+
+        projectRepository.save(project);
+        IndentRequest saved = indentRequestRepository.save(indentRequest);
+
+        return ResponseEntity.ok(Map.of(
+                "indent", saved,
+                "overBudget", overBudget,
+                "message", overBudget ? "Warning: Budget exceeded for selected head." : "Indent created successfully."
+        ));
     }
 
-    UserDetailsImpl userDetails = (UserDetailsImpl) auth.getPrincipal();
-    User user = userRepository.findByUsername(userDetails.getUsername())
-            .orElseThrow(() -> new RuntimeException("User not found"));
 
-    // Use ObjectNode to extract fields manually
-    ObjectMapper objectMapper = new ObjectMapper();
-    JsonNode root = objectMapper.readTree(indentData);
-
-    String recipientType = root.get("recipientType").asText();  // ✅ FLA or SLA
-    Long recipientId = root.get("recipientId").asLong();
-
-    // Remove extra fields before mapping to IndentRequest
-    ((ObjectNode) root).remove("recipientType");
-    ((ObjectNode) root).remove("recipientId");
-
-    // Deserialize clean JSON to IndentRequest
-    IndentRequest indentRequest = objectMapper.treeToValue(root, IndentRequest.class);
-
-    indentRequest.setRequestedBy(user);
-    indentRequest.setCreatedAt(LocalDateTime.now());
-    indentRequest.setStatus(IndentStatus.PENDING_FLA); // or handle dynamically later
-
-    // Link products
-    for (IndentProduct item : indentRequest.getItems()) {
-        item.setIndentRequest(indentRequest);
-    }
-
-    // Save file to disk if file is present
-    if (file != null && !file.isEmpty()) {
-        String uploadDir = "uploads/";
-        String fileName = UUID.randomUUID() + "_" + file.getOriginalFilename();
-        Path path = Paths.get(uploadDir + fileName);
-        Files.createDirectories(path.getParent());
-        Files.write(path, file.getBytes());
-        indentRequest.setAttachmentPath(fileName);
-    }
-
-    // TODO: Based on recipientType and recipientId set FLA or SLA
-    if ("FLA".equalsIgnoreCase(recipientType)) {
-        User fla = userRepository.findById(recipientId).orElseThrow(() -> new RuntimeException("FLA not found"));
-        indentRequest.setFla(fla);
-        indentRequest.setStatus(IndentStatus.PENDING_FLA);
-    } else if ("SLA".equalsIgnoreCase(recipientType)) {
-        User sla = userRepository.findById(recipientId).orElseThrow(() -> new RuntimeException("SLA not found"));
-        indentRequest.setSla(sla);
-        indentRequest.setStatus(IndentStatus.PENDING_SLA); // Skip FLA directly
-    }
-
-    IndentRequest saved = indentRequestRepository.save(indentRequest);
-
-    return ResponseEntity.ok(saved);
-}
 
 
 
@@ -626,6 +763,38 @@ public ResponseEntity<?> createIndent(
         return ResponseEntity.ok(Map.of("message", "Payment completed, indent marked as successful"));
     }
 
+    @PreAuthorize("hasAnyRole('FLA', 'SLA', 'STORE', 'FINANCE', 'PURCHASE')")
+    @GetMapping("/file/{fileName:.+}")
+    public ResponseEntity<Resource> getFile(@PathVariable String fileName) throws IOException {
+        // Sanitize file name
+        if (fileName.contains("..")) {
+            throw new SecurityException("Invalid file path: " + fileName);
+        }
+        System.err.println("inside the file attachemtn endpoitnt 175");
+        // Resolve file path
+        Path filePath = Paths.get("uploads","products").toAbsolutePath().normalize().resolve(fileName).normalize();
+        System.err.println("Resolved File Path: " + filePath);
+        // Load file as resource
+        Resource resource;
+        try {
+            resource = new UrlResource(filePath.toUri());
+            if (!resource.exists() || !resource.isReadable()) {
+                throw new FileNotFoundException("File not found or unreadable: " + fileName);
+            }
+        } catch (MalformedURLException e) {
+            throw new FileNotFoundException("Invalid file path: " + fileName);
+        }
+        // Determine content type
+        String contentType = Files.probeContentType(filePath);
+        if (contentType == null) {
+            contentType = "application/octet-stream";
+        }
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(contentType))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + resource.getFilename() + "\"")
+                .body(resource);
+    }
 
     @PostMapping("/user/inspect")
     public ResponseEntity<?> inspectReceivedItem(@RequestBody Map<String, Object> request, Authentication auth) {
@@ -807,6 +976,51 @@ public ResponseEntity<?> createIndent(
         return ResponseEntity.ok(indents);
     }
 
+//    @PostMapping("/finance/payment/submit")
+//    public ResponseEntity<?> submitPayment(@RequestBody Map<String, Object> body, Authentication auth) {
+//        if (auth == null || !auth.isAuthenticated()) throw new AccessDeniedException("Unauthorized");
+//
+//        Long indentId = Long.valueOf(body.get("indentId").toString());
+//        String paymentNote = (String) body.get("paymentNote");
+//
+//        IndentRequest indent = indentRequestRepository.findById(indentId)
+//                .orElseThrow(() -> new RuntimeException("Indent not found"));
+//
+//        if (indent.getStatus() != IndentStatus.PENDING_FINANCE_PAYMENT) {
+//            return ResponseEntity.badRequest().body("Not in Payment stage");
+//        }
+//
+//        indent.setPaymentNote(paymentNote);
+//        indent.setStatus(IndentStatus.PAYMENT_COMPLETED);
+//        indent.setPaymentCreatedAt(LocalDateTime.now());
+//
+//        indentRequestRepository.save(indent);
+//
+//        // Send email to user about payment completion
+//        User user =indent.getRequestedBy();
+//
+//        if(user!= null && user.getEmail()!= null){
+//            String userEmail = user.getEmail();
+//            String Username= user.getUsername();
+//            String emailBody = "Hello " +Username + ",\n\n" +
+//                    "The payment for your indent request has been completed.\n" +
+//                    "Indent ID: " + indentId + "\n" +
+//                    "Project Name: " + indent.getProjectName() + "\n" +
+//                    "Item Name: " + indent.getItemName() + "\n" +
+//                    "Quantity: " + indent.getQuantity() + "\n" +
+//                    "Per Piece Cost: " + indent.getPerPieceCost() + "\n" +
+//                    "Department: " + indent.getDepartment() + "\n" +
+//                    "Description: " + indent.getDescription() + "\n\n" +
+//                    "Best regards,\n" +
+//                    "Your Indent Management System";
+//            emailService.sendEmail(user.getEmail(), " Indent Payment Completed", emailBody);
+//        }
+//
+//        return ResponseEntity.ok(Map.of("message", "Payment cleared successfully"));
+//    }
+
+
+
     @PostMapping("/finance/payment/submit")
     public ResponseEntity<?> submitPayment(@RequestBody Map<String, Object> body, Authentication auth) {
         if (auth == null || !auth.isAuthenticated()) throw new AccessDeniedException("Unauthorized");
@@ -827,28 +1041,25 @@ public ResponseEntity<?> createIndent(
 
         indentRequestRepository.save(indent);
 
-        // Send email to user about payment completion
-        User user =indent.getRequestedBy();
+        // Optional: Lock or audit balance confirmation
+        // Project already updated on creation — this just confirms it
 
-        if(user!= null && user.getEmail()!= null){
-            String userEmail = user.getEmail();
-            String Username= user.getUsername();
-            String emailBody = "Hello " +Username + ",\n\n" +
+        // Send email
+        User user = indent.getRequestedBy();
+        if (user != null && user.getEmail() != null) {
+            String emailBody = "Hello " + user.getUsername() + ",\n\n" +
                     "The payment for your indent request has been completed.\n" +
                     "Indent ID: " + indentId + "\n" +
-                    "Project Name: " + indent.getProjectName() + "\n" +
-                    "Item Name: " + indent.getItemName() + "\n" +
-                    "Quantity: " + indent.getQuantity() + "\n" +
-                    "Per Piece Cost: " + indent.getPerPieceCost() + "\n" +
-                    "Department: " + indent.getDepartment() + "\n" +
-                    "Description: " + indent.getDescription() + "\n\n" +
-                    "Best regards,\n" +
-                    "Your Indent Management System";
-            emailService.sendEmail(user.getEmail(), " Indent Payment Completed", emailBody);
+                    "Project: " + indent.getProject().getProjectName() + "\n" +
+                    "Total Items: " + indent.getItems().size() + "\n\n" +
+                    "Regards,\nIndent Management System";
+            emailService.sendEmail(user.getEmail(), "Indent Payment Completed", emailBody);
         }
 
         return ResponseEntity.ok(Map.of("message", "Payment cleared successfully"));
     }
+
+
 
 //    @GetMapping("/user/all")
 //    public ResponseEntity<?> getAllIndentsForUser(Authentication authentication) {
