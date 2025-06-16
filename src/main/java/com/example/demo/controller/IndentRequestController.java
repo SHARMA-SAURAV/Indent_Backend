@@ -796,6 +796,77 @@ public class IndentRequestController {
                 .body(resource);
     }
 
+    @PreAuthorize("hasAnyRole('FLA', 'SLA', 'STORE', 'FINANCE', 'PURCHASE')")
+    @GetMapping("/fileresubmit/{fileName:.+}")
+    public ResponseEntity<Resource> getFileresubmit(@PathVariable String fileName) throws IOException {
+        // Sanitize file name
+        if (fileName.contains("..")) {
+            throw new SecurityException("Invalid file path: " + fileName);
+        }
+
+        System.err.println("inside the file attachemtn endpoitnt 806");
+        // Resolve file path
+        Path filePath = Paths.get("uploads").toAbsolutePath().normalize().resolve(fileName).normalize();
+        System.err.println("Resolved File Path: " + filePath);
+        // Load file as resource
+        Resource resource;
+
+        try {
+            resource = new UrlResource(filePath.toUri());
+            if (!resource.exists() || !resource.isReadable()) {
+                throw new FileNotFoundException("File not found or unreadable: " + fileName);
+            }
+        } catch (MalformedURLException e) {
+            throw new FileNotFoundException("Invalid file path: " + fileName);
+        }
+        // Determine content type
+        String contentType = Files.probeContentType(filePath);
+        if (contentType == null) {
+            contentType = "application/octet-stream";
+        }
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(contentType))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + resource.getFilename() + "\"")
+                .body(resource);
+    }
+
+
+    @PreAuthorize("hasAnyRole('FLA', 'SLA', 'STORE', 'FINANCE', 'PURCHASE')")
+    @GetMapping("/inspectionviewer/{fileName:.+}")
+    public ResponseEntity<Resource> inspectionFileViewer(@PathVariable String fileName) throws IOException {
+        // Sanitize file name
+        if (fileName.contains("..")) {
+            throw new SecurityException("Invalid file path: " + fileName);
+        }
+
+        System.err.println("inside the file attachemtn endpoitnt 806");
+        // Resolve file path
+        Path filePath = Paths.get("uploads","inspection_reports").toAbsolutePath().normalize().resolve(fileName).normalize();
+        System.err.println("Resolved File Path: " + filePath);
+        // Load file as resource
+        Resource resource;
+
+        try {
+            resource = new UrlResource(filePath.toUri());
+            if (!resource.exists() || !resource.isReadable()) {
+                throw new FileNotFoundException("File not found or unreadable: " + fileName);
+            }
+        } catch (MalformedURLException e) {
+            throw new FileNotFoundException("Invalid file path: " + fileName);
+        }
+        // Determine content type
+        String contentType = Files.probeContentType(filePath);
+        if (contentType == null) {
+            contentType = "application/octet-stream";
+        }
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(contentType))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + resource.getFilename() + "\"")
+                .body(resource);
+    }
+
     @PostMapping("/user/inspect")
     public ResponseEntity<?> inspectReceivedItem(@RequestBody Map<String, Object> request, Authentication auth) {
         if (auth == null || !auth.isAuthenticated()) throw new AccessDeniedException("Not authenticated");
@@ -831,8 +902,58 @@ public class IndentRequestController {
 
         return ResponseEntity.ok(pending);
     }
-    @PostMapping("/{indentId}/confirm-inspection")
-    public ResponseEntity<?> confirmInspection(@PathVariable Long indentId, @RequestBody Map<String, String> requestBody, Authentication authentication) {
+//    @PostMapping("/{indentId}/confirm-inspection")
+//    public ResponseEntity<?> confirmInspection(@PathVariable Long indentId, @RequestBody Map<String, String> requestBody, Authentication authentication) {
+//        if (authentication == null || !authentication.isAuthenticated()) {
+//            throw new AccessDeniedException("Not authenticated");
+//        }
+//
+//        IndentRequest indent = indentRequestRepository.findById(indentId)
+//                .orElseThrow(() -> new RuntimeException("Indent not found"));
+//
+//        if (indent.getStatus() != IndentStatus.WAITING_FOR_USER_CONFIRMATION) {
+//            return ResponseEntity.badRequest().body("Indent not in inspection stage");
+//        }
+//
+//        String remark = requestBody.get("remark");
+//        indent.setStatus(IndentStatus.PENDING_PURCHASE_GFR);
+//        indent.setUserInspectionDate(LocalDateTime.now());
+//        indent.setRemarkByUser(remark);
+//
+//        // print all these parameter
+//        System.err.println("Indent ID: " + indentId);
+//        System.err.println("Status: " + indent.getStatus());
+//        System.err.println("User Inspection Date: " + indent.getUserInspectionDate());
+//        System.err.println("Remark: " + remark);
+//        indentRequestRepository.save(indent);
+//        // Send email notification to Purchase
+//        String emailBody = "Hello Purchase Team,\n\n" +
+//                "The indent request has been confirmed by the user.\n" +
+//                "Indent ID: " + indentId + "\n" +
+//                "Project Name: " + indent.getProjectName() + "\n" +
+//                "Item Name: " + indent.getItemName() + "\n" +
+//                "Quantity: " + indent.getQuantity() + "\n" +
+//                "Per Piece Cost: " + indent.getPerPieceCost() + "\n" +
+//                "Department: " + indent.getDepartment() + "\n" +
+//                "Description: " + indent.getDescription() + "\n\n" +
+//                "Please log in to the system to make a GFR report for the request.\n\n" +
+//                "Best regards,\n" +
+//                "Your Indent Management System";
+//        emailService.sendEmail("Purchase@gmail.com", "Generate GFR Report", emailBody);
+//        return ResponseEntity.ok(Map.of("message", "Product confirmed as OK"));
+//    }
+
+
+
+
+
+    @PostMapping(value = "/{indentId}/confirm-inspection", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> confirmInspection(
+            @PathVariable Long indentId,
+            @RequestPart(value = "remark", required = false) String remark,
+            @RequestPart(value = "inspectionReport", required = false) MultipartFile inspectionReport,
+            Authentication authentication) throws IOException {
+
         if (authentication == null || !authentication.isAuthenticated()) {
             throw new AccessDeniedException("Not authenticated");
         }
@@ -844,34 +965,28 @@ public class IndentRequestController {
             return ResponseEntity.badRequest().body("Indent not in inspection stage");
         }
 
-        String remark = requestBody.get("remark");
+        // Save inspection report file if present
+        if (inspectionReport != null && !inspectionReport.isEmpty()) {
+            String uploadDir = "uploads/inspection_reports/";
+            String fileName = UUID.randomUUID() + "_" + inspectionReport.getOriginalFilename();
+            Path path = Paths.get(uploadDir + fileName);
+            Files.createDirectories(path.getParent());
+            Files.write(path, inspectionReport.getBytes());
+            // Store file path in indent (add a field if needed)
+            indent.setInspectionReportPath(fileName);
+            System.err.println(fileName);
+        }
+
         indent.setStatus(IndentStatus.PENDING_PURCHASE_GFR);
         indent.setUserInspectionDate(LocalDateTime.now());
         indent.setRemarkByUser(remark);
 
-        // print all these parameter
-        System.err.println("Indent ID: " + indentId);
-        System.err.println("Status: " + indent.getStatus());
-        System.err.println("User Inspection Date: " + indent.getUserInspectionDate());
-        System.err.println("Remark: " + remark);
         indentRequestRepository.save(indent);
-        // Send email notification to Purchase
-        String emailBody = "Hello Purchase Team,\n\n" +
-                "The indent request has been confirmed by the user.\n" +
-                "Indent ID: " + indentId + "\n" +
-                "Project Name: " + indent.getProjectName() + "\n" +
-                "Item Name: " + indent.getItemName() + "\n" +
-                "Quantity: " + indent.getQuantity() + "\n" +
-                "Per Piece Cost: " + indent.getPerPieceCost() + "\n" +
-                "Department: " + indent.getDepartment() + "\n" +
-                "Description: " + indent.getDescription() + "\n\n" +
-                "Please log in to the system to make a GFR report for the request.\n\n" +
-                "Best regards,\n" +
-                "Your Indent Management System";
-        emailService.sendEmail("Purchase@gmail.com", "Generate GFR Report", emailBody);
+
+        // Optionally send email, etc.
+
         return ResponseEntity.ok(Map.of("message", "Product confirmed as OK"));
     }
-
 
 
     @PostMapping("/purchase/generate-gfr")
@@ -972,7 +1087,10 @@ public class IndentRequestController {
     public ResponseEntity<?> getIndentForPayment(Authentication auth) {
         if (auth == null || !auth.isAuthenticated()) throw new AccessDeniedException("Unauthorized");
 
-        List<IndentRequest> indents = indentRequestRepository.findByStatus(IndentStatus.PENDING_FINANCE_PAYMENT);
+        List<IndentRequest> indents = indentRequestRepository.findByStatusIn(
+                List.of(IndentStatus.PENDING_FINANCE_PAYMENT, IndentStatus.RESUBMITTED_TO_FINANCE)
+        );
+
         return ResponseEntity.ok(indents);
     }
 
@@ -1031,7 +1149,7 @@ public class IndentRequestController {
         IndentRequest indent = indentRequestRepository.findById(indentId)
                 .orElseThrow(() -> new RuntimeException("Indent not found"));
 
-        if (indent.getStatus() != IndentStatus.PENDING_FINANCE_PAYMENT) {
+        if (indent.getStatus() != IndentStatus.PENDING_FINANCE_PAYMENT && indent.getStatus() != IndentStatus.RESUBMITTED_TO_FINANCE) {
             return ResponseEntity.badRequest().body("Not in Payment stage");
         }
 

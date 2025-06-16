@@ -83,8 +83,6 @@ public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Excepti
                     .requestMatchers("/api/indent/purchase/generate-gfr").hasRole("PURCHASE")
                     .requestMatchers("/api/indent/finance/pay").hasRole("FINANCE")
                     .requestMatchers("/api/indent/user/all").hasRole("USER")
-
-
                     .requestMatchers("/api/indent/{indentId}/assign-sla/{slaId}").hasRole("FLA")
                     .requestMatchers("/api/indent/{indentId}/forward-store").hasRole("SLA")
                     .requestMatchers("/api/indent/{indentId}/forward-finance").hasRole("STORE")

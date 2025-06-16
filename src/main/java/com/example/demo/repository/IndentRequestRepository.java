@@ -11,12 +11,13 @@ import java.util.List;
 
 public interface IndentRequestRepository extends JpaRepository<IndentRequest, Long> {
    public  List<IndentRequest> findByStatus(IndentStatus status);
-
+ List<IndentRequest> findByStatusIn(List<IndentStatus> statuses);
     List<IndentRequest> findByRequestedById(Long userId);
     List<IndentRequest> findByFlaId(Long flaId);
     List<IndentRequest> findBySlaId(Long slaId);
     List<IndentRequest> findByFlaAndStatus(User fla, IndentStatus status);
     List<IndentRequest> findBySlaAndStatus(User sla, IndentStatus status);
+    List<IndentRequest> findBySlaAndStatusIn(User sla, List<IndentStatus> status);
 
     List<IndentRequest> findByStatusAndAssignedToId(IndentStatus status, Long userId);
     List<IndentRequest> findByStatusAndStore_Id(IndentStatus status, Long storeId);
@@ -66,6 +67,11 @@ public interface IndentRequestRepository extends JpaRepository<IndentRequest, Lo
 
  @Query("SELECT DISTINCT ir.category FROM IndentRequest ir WHERE ir.category IS NOT NULL")
  List<String> findAllCategories();
+
+@Query("SELECT i FROM IndentRequest i"+
+        " WHERE i.status IN :statuses AND"+
+        "(:userId = i.fla.id OR :userId = i.sla.id OR :userId = i.store.id OR :userId = i.purchase.id)")
+ List<IndentRequest> findByStatusInAndRelevantRole(@Param("statuses") List<IndentStatus> statuses, @Param("userId")Long userId);
 
 }
 

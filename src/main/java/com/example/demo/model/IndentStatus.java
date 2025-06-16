@@ -35,8 +35,12 @@ public enum IndentStatus {
 
     //    PENDING_PURCHASE,
     PURCHASE_PROCESSING,
-    //    WAITING_FOR_USER_CONFIRMATION,
-    INWARD_PENDING,
-    READY_FOR_INSPECTION,
-    // Rejected at any stage      // Rejected at any stage
+
+    SENT_BACK_TO_FLA,
+    SENT_BACK_TO_SLA,
+    SENT_BACK_TO_STORE,
+    SENT_BACK_TO_PURCHASE,
+    RESUBMITTED_TO_FINANCE,
+
+
 }

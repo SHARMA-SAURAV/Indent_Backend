@@ -294,6 +294,7 @@ public class IndentRequest {
     private LocalDateTime gfrCreatedAt;
     private LocalDateTime paymentCreatedAt;
     private LocalDateTime paymentDate;
+    private LocalDateTime financeReamrksDate;
 
     // ===== REMARKS BY DIFFERENT ROLES =====
     private String remarkByFla;
@@ -308,6 +309,8 @@ public class IndentRequest {
     private String paymentNote;
     private String gfrDetails;
     private String paymentRemark;
+    private String financeRemarks;
+    private String productRemarks;
 
     // ===== EXISTING RELATIONSHIPS =====
     @OneToMany(mappedBy = "indentRequest", cascade = CascadeType.ALL)
@@ -322,6 +325,7 @@ public class IndentRequest {
     // ===== UTILITY FIELDS =====
     private boolean inwardEntryGenerated = false;
     private Date updatedAt;
+    private LocalDateTime againUpdatedAt;
 
     // File handling metadata
     private LocalDateTime fileUploadedAt;
@@ -333,6 +337,7 @@ public class IndentRequest {
 
     //attachment path
     private String attachmentPath;
+    private String inspectionReportPath;
     // ===== UTILITY METHODS =====
 
     /**
