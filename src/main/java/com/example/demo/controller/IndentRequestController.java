@@ -469,7 +469,6 @@ public class IndentRequestController {
         return ResponseEntity.ok(Map.of("message", "Products reviewed successfully"));
     }
 
-
 //
 //    // IndentController.java
     @GetMapping("/store/pending")
@@ -867,6 +866,41 @@ public class IndentRequestController {
                 .body(resource);
     }
 
+    @PreAuthorize("hasAnyRole('FLA', 'SLA', 'STORE', 'FINANCE', 'PURCHASE')")
+    @GetMapping("/gfrViewer/{fileName:.+}")
+    public ResponseEntity<Resource> gfrFileViewer(@PathVariable String fileName) throws IOException {
+        // Sanitize file name
+        if (fileName.contains("..")) {
+            throw new SecurityException("Invalid file path: " + fileName);
+        }
+
+        System.err.println("inside the file attachemtn endpoitnt 806");
+        // Resolve file path
+        Path filePath = Paths.get("uploads","gfr_reports").toAbsolutePath().normalize().resolve(fileName).normalize();
+        System.err.println("Resolved File Path: " + filePath);
+        // Load file as resource
+        Resource resource;
+
+        try {
+            resource = new UrlResource(filePath.toUri());
+            if (!resource.exists() || !resource.isReadable()) {
+                throw new FileNotFoundException("File not found or unreadable: " + fileName);
+            }
+        } catch (MalformedURLException e) {
+            throw new FileNotFoundException("Invalid file path: " + fileName);
+        }
+        // Determine content type
+        String contentType = Files.probeContentType(filePath);
+        if (contentType == null) {
+            contentType = "application/octet-stream";
+        }
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(contentType))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + resource.getFilename() + "\"")
+                .body(resource);
+    }
+
     @PostMapping("/user/inspect")
     public ResponseEntity<?> inspectReceivedItem(@RequestBody Map<String, Object> request, Authentication auth) {
         if (auth == null || !auth.isAuthenticated()) throw new AccessDeniedException("Not authenticated");
@@ -1046,13 +1080,29 @@ public class IndentRequestController {
         return ResponseEntity.ok(indents);
     }
 
-    @PostMapping("/purchase/gfr/submit")
-    public ResponseEntity<?> submitGFR(@RequestBody Map<String, Object> body, Authentication auth) {
+    @PostMapping(value = "/purchase/gfr/submit", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> submitGFR(
+            @RequestPart("indentId") String indentIdStr,
+            @RequestPart("gfrNote") String gfrNote,
+            @RequestPart("gfrReport") MultipartFile gfrReport,
+            Authentication auth) throws IOException {
         if (auth == null || !auth.isAuthenticated()) throw new AccessDeniedException("Unauthorized");
 
-        System.err.println("heelhelheheuehuehuhjkahdfjkhasdfjkhadsf");
-        Long indentId = Long.valueOf(body.get("indentId").toString());
-        String gfrNote = (String) body.get("gfrNote");
+        // Debug: print incoming values
+        System.err.println("indentId: " + indentIdStr);
+        System.err.println("gfrNote: " + gfrNote);
+        System.err.println("gfrReport: " + (gfrReport != null ? gfrReport.getOriginalFilename() : "null"));
+
+        if (gfrReport == null || gfrReport.isEmpty()) {
+            return ResponseEntity.badRequest().body("GFR report attachment is required");
+        }
+
+        Long indentId;
+        try {
+            indentId = Long.parseLong(indentIdStr);
+        } catch (NumberFormatException e) {
+            return ResponseEntity.badRequest().body("Invalid indentId");
+        }
 
         IndentRequest indent = indentRequestRepository.findById(indentId)
                 .orElseThrow(() -> new RuntimeException("Indent not found"));
@@ -1061,12 +1111,21 @@ public class IndentRequestController {
             return ResponseEntity.badRequest().body("Not in GFR stage");
         }
 
+        // Save GFR report file
+        String uploadDir = "uploads/gfr_reports/";
+        String fileName = java.util.UUID.randomUUID() + "_" + gfrReport.getOriginalFilename();
+        java.nio.file.Path path = java.nio.file.Paths.get(uploadDir + fileName);
+        java.nio.file.Files.createDirectories(path.getParent());
+        java.nio.file.Files.write(path, gfrReport.getBytes());
+        indent.setGfrReportPath(fileName);
+
         indent.setGfrNote(gfrNote);
         indent.setStatus(IndentStatus.PENDING_FINANCE_PAYMENT);
-        indent.setGfrCreatedAt(LocalDateTime.now());
+        indent.setGfrCreatedAt(java.time.LocalDateTime.now());
 
         indentRequestRepository.save(indent);
-// send email to finance to complete the payment for indent
+
+        // send email to finance to complete the payment for indent
         String emailBody = "Hello Finance Team,\n\n" +
                 "An indent request has been approved by Purchase and is now pending your payment.\n" +
                 "Indent ID: " + indentId + "\n" +
@@ -1081,7 +1140,7 @@ public class IndentRequestController {
                 "Your Indent Management System";
         emailService.sendEmail("financeteam@gmail.com", "Indent Approval Required", emailBody);
 
-        return ResponseEntity.ok(Map.of("message", "GFR submitted successfully"));
+        return ResponseEntity.ok(java.util.Map.of("message", "GFR submitted successfully"));
     }
 
     @GetMapping("/finance/payment/pending")

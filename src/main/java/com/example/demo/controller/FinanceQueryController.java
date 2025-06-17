@@ -3,6 +3,7 @@ package com.example.demo.controller;
 
 import com.example.demo.model.IndentRequest;
 import com.example.demo.model.IndentStatus;
+import com.example.demo.model.RoleType;
 import com.example.demo.model.User;
 import com.example.demo.repository.IndentRequestRepository;
 import com.example.demo.repository.UserRepository;
@@ -65,6 +66,17 @@ public class FinanceQueryController {
                 indent.setStatus(IndentStatus.SENT_BACK_TO_PURCHASE);
                 indent.setFinanceRemarks(remarks);
                 indent.setFinanceReamrksDate(LocalDateTime.now());
+                // Fix: assign purchase user only if not null and handle errors gracefully
+                try {
+                    User purchaseUser = userRepository.findByRole(RoleType.PURCHASE).stream().findFirst().orElse(null);
+                    if (purchaseUser != null) {
+                        indent.setPurchase(purchaseUser);
+                    } else {
+                        System.err.println("[WARN] No purchase user found to assign.");
+                    }
+                } catch (Exception e) {
+                    System.err.println("[WARN] Could not set purchase user: " + e.getMessage());
+                }
                 break;
             default:
                 throw new RuntimeException("Invalid role");
@@ -116,41 +128,73 @@ public class FinanceQueryController {
         ));
     }
 
+
+
+
     @GetMapping("/returned-to-role")
     public ResponseEntity<?> getReturnedIndentsForRole(Authentication auth) {
         if (auth == null || !auth.isAuthenticated()) {
             throw new AccessDeniedException("Not authenticated");
         }
+
         System.err.println("heu heiehehueheuheuheuheuheuheheuheuh");
 
         UserDetailsImpl userDetails = (UserDetailsImpl) auth.getPrincipal();
         User currentUser = userRepository.findByUsername(userDetails.getUsername())
                 .orElseThrow(() -> new RuntimeException("User not found"));
-        String role = currentUser.getRoles().stream().findFirst()
-                .orElseThrow(() -> new RuntimeException("Role not found"))
-                .name().toUpperCase();
 
-        List<IndentStatus> targetStatuses = switch (role) {
-            case "FLA" -> List.of(IndentStatus.SENT_BACK_TO_FLA);
-            case "SLA" -> List.of(IndentStatus.SENT_BACK_TO_SLA);
-            case "STORE" -> List.of(IndentStatus.SENT_BACK_TO_STORE);
-            case "PURCHASE" -> List.of(IndentStatus.SENT_BACK_TO_PURCHASE);
-            case "USER" -> List.of(); // No yield needed
+        // Find the highest priority role (not USER)
+        String role = currentUser.getRoles().stream()
+            .map(r -> r.name().toUpperCase())
+            .filter(r -> !r.equals("USER"))
+            .findFirst()
+            .orElse(currentUser.getRoles().stream().findFirst().map(r -> r.name().toUpperCase()).orElse("USER"));
+
+        System.err.println("[DEBUG] User roles: " + currentUser.getRoles());
+        System.err.println("[DEBUG] Detected role: " + role);
+
+        List<IndentRequest> returnedIndents = List.of();
+        Long userId = (long) currentUser.getId();
+
+        switch (role) {
+            case "FLA" -> returnedIndents = indentRequestRepository.findByStatusInAndFla(List.of(IndentStatus.SENT_BACK_TO_FLA), userId);
+            case "SLA" -> returnedIndents = indentRequestRepository.findByStatusInAndSla(List.of(IndentStatus.SENT_BACK_TO_SLA), userId);
+            case "STORE" -> {
+                returnedIndents = indentRequestRepository.findByStatusInAndStore(List.of(IndentStatus.SENT_BACK_TO_STORE), userId);
+                System.err.println("[DEBUG] STORE userId: " + userId);
+                for (IndentRequest ir : returnedIndents) {
+                    System.err.println("[DEBUG] STORE Indent: id=" + ir.getId() + ", status=" + ir.getStatus() + ", store.id=" + (ir.getStore() != null ? ir.getStore().getId() : null));
+                }
+            }
+            case "PURCHASE" -> {
+                // Always include both: assigned to this user and unassigned (purchase=null)
+                List<IndentRequest> assigned = indentRequestRepository.findByStatusInAndPurchase(List.of(IndentStatus.SENT_BACK_TO_PURCHASE), userId);
+                List<IndentRequest> unassigned = indentRequestRepository.findByStatusIn(List.of(IndentStatus.SENT_BACK_TO_PURCHASE))
+                    .stream().filter(ir -> ir.getPurchase() == null).toList();
+                returnedIndents = new java.util.ArrayList<>();
+                returnedIndents.addAll(assigned);
+                returnedIndents.addAll(unassigned);
+                System.err.println("[DEBUG] PURCHASE userId: " + userId);
+                for (IndentRequest ir : returnedIndents) {
+                    System.err.println("[DEBUG] PURCHASE Indent: id=" + ir.getId() + ", status=" + ir.getStatus() + ", purchase.id=" + (ir.getPurchase() != null ? ir.getPurchase().getId() : null));
+                }
+            }
+
             default -> throw new RuntimeException("Invalid role: " + role);
-        };
-
-        if (targetStatuses.isEmpty()) {
-            return ResponseEntity.ok(List.of());
         }
 
-        List<IndentRequest> returnedIndents = indentRequestRepository
-                .findByStatusInAndRelevantRole(targetStatuses, (long) currentUser.getId());
-
+        System.err.println("  149   ajsdkfjaklsjfieeinfiakdheu ");
         return ResponseEntity.ok(returnedIndents);
     }
 
-
-
-
+    // DEBUG: List all indents with SENT_BACK_TO_PURCHASE status and their purchase user
+    @GetMapping("/debug/purchase-indents")
+    public ResponseEntity<?> debugPurchaseIndents() {
+        List<IndentRequest> indents = indentRequestRepository.findByStatusIn(List.of(IndentStatus.SENT_BACK_TO_PURCHASE));
+        for (IndentRequest ir : indents) {
+            System.err.println("[DEBUG] Indent id=" + ir.getId() + ", status=" + ir.getStatus() + ", purchase.id=" + (ir.getPurchase() != null ? ir.getPurchase().getId() : null));
+        }
+        return ResponseEntity.ok(indents);
+    }
 
 }

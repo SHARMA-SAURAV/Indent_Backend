@@ -68,10 +68,22 @@ public interface IndentRequestRepository extends JpaRepository<IndentRequest, Lo
  @Query("SELECT DISTINCT ir.category FROM IndentRequest ir WHERE ir.category IS NOT NULL")
  List<String> findAllCategories();
 
-@Query("SELECT i FROM IndentRequest i"+
-        " WHERE i.status IN :statuses AND"+
-        "(:userId = i.fla.id OR :userId = i.sla.id OR :userId = i.store.id OR :userId = i.purchase.id)")
- List<IndentRequest> findByStatusInAndRelevantRole(@Param("statuses") List<IndentStatus> statuses, @Param("userId")Long userId);
+//@Query("SELECT i FROM IndentRequest i"+
+//        " WHERE i.status IN :statuses AND"+
+//        "(:userId = i.fla.id OR :userId = i.sla.id OR :userId = i.store.id OR :userId = i.purchase.id)")
+// List<IndentRequest> findByStatusInAndRelevantRole(@Param("statuses") List<IndentStatus> statuses, @Param("userId")Long userId);
+
+
+    @Query("SELECT i FROM IndentRequest i WHERE i.status IN :statuses AND i.fla.id = :userId")
+    List<IndentRequest> findByStatusInAndFla(@Param("statuses") List<IndentStatus> statuses, @Param("userId") Long userId);
+
+    @Query("SELECT i FROM IndentRequest i WHERE i.status IN :statuses AND i.sla.id = :userId")
+    List<IndentRequest> findByStatusInAndSla(@Param("statuses") List<IndentStatus> statuses, @Param("userId") Long userId);
+
+    @Query("SELECT i FROM IndentRequest i WHERE i.status IN :statuses AND i.store.id = :userId")
+    List<IndentRequest> findByStatusInAndStore(@Param("statuses") List<IndentStatus> statuses, @Param("userId") Long userId);
+    @Query("SELECT i FROM IndentRequest i WHERE i.status IN :statuses AND i.purchase.id = :userId")
+    List<IndentRequest> findByStatusInAndPurchase(@Param("statuses") List<IndentStatus> statuses, @Param("userId") Long userId);
+
 
 }
-
