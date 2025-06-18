@@ -901,6 +901,42 @@ public class IndentRequestController {
                 .body(resource);
     }
 
+    @PreAuthorize("hasAnyRole('FLA', 'SLA', 'STORE', 'FINANCE', 'PURCHASE')")
+    @GetMapping("/inwardentryviewer/{fileName:.+}")
+    public ResponseEntity<Resource> inwardEntryViewer(@PathVariable String fileName) throws IOException {
+        // Sanitize file name
+        if (fileName.contains("..")) {
+            throw new SecurityException("Invalid file path: " + fileName);
+        }
+
+        System.err.println("inside the file attachemtn endpoitnt 806");
+        // Resolve file path
+        Path filePath = Paths.get("uploads","inward_reports").toAbsolutePath().normalize().resolve(fileName).normalize();
+        System.err.println("Resolved File Path: " + filePath);
+        // Load file as resource
+        Resource resource;
+
+        try {
+            resource = new UrlResource(filePath.toUri());
+            if (!resource.exists() || !resource.isReadable()) {
+                throw new FileNotFoundException("File not found or unreadable: " + fileName);
+            }
+        } catch (MalformedURLException e) {
+            throw new FileNotFoundException("Invalid file path: " + fileName);
+        }
+        // Determine content type
+        String contentType = Files.probeContentType(filePath);
+        if (contentType == null) {
+            contentType = "application/octet-stream";
+        }
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(contentType))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + resource.getFilename() + "\"")
+                .body(resource);
+    }
+
+
     @PostMapping("/user/inspect")
     public ResponseEntity<?> inspectReceivedItem(@RequestBody Map<String, Object> request, Authentication auth) {
         if (auth == null || !auth.isAuthenticated()) throw new AccessDeniedException("Not authenticated");

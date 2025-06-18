@@ -339,6 +339,7 @@ public class IndentRequest {
     private String attachmentPath;
     private String inspectionReportPath;
     private String gfrReportPath; // Path to uploaded GFR report file
+    private String inwardEntryReportPath;
     // ===== UTILITY METHODS =====
 
     /**

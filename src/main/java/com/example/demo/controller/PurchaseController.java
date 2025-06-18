@@ -5,12 +5,15 @@ import com.example.demo.repository.IndentRequestRepository;
 import com.example.demo.repository.PurchaseReviewRepository;
 import com.example.demo.service.EmailService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -188,9 +191,11 @@ public class PurchaseController {
 
 
     // POST: Purchase reviews individual indent items
-    @PostMapping("/review-products")
-    public ResponseEntity<?> reviewProducts(@RequestBody Map<String, Object> request,
-                                            Authentication authentication) {
+    @PostMapping(value = "/review-products" , consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> reviewProducts(
+            @RequestPart("data") Map<String, Object> request,
+            @RequestPart("inwardEntryFile") MultipartFile inwardEntryFile,
+            Authentication authentication) throws IOException {
         if (authentication == null || !authentication.isAuthenticated()) {
             throw new AccessDeniedException("Not authenticated");
         }
@@ -218,6 +223,14 @@ public class PurchaseController {
                 product.setPurchaseRemarks(remarks.getOrDefault(product.getId().toString(), ""));
             }
         }
+
+        String uploadDir = "uploads/inward_reports/";
+        String fileName = java.util.UUID.randomUUID() + "_" + inwardEntryFile.getOriginalFilename();
+        java.nio.file.Path path = java.nio.file.Paths.get(uploadDir + fileName);
+        java.nio.file.Files.createDirectories(path.getParent());
+        java.nio.file.Files.write(path, inwardEntryFile.getBytes());
+        indent.setInwardEntryReportPath(fileName);
+
 
         indent.setRemarkByPurchase("Reviewed by Purchase");
         indent.setPurchaseCompletionDate(LocalDateTime.now());
