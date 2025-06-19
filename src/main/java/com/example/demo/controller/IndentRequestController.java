@@ -258,10 +258,13 @@ public class IndentRequestController {
             User fla = userRepository.findById(recipientId).orElseThrow(() -> new RuntimeException("FLA not found"));
             indentRequest.setFla(fla);
             indentRequest.setStatus(IndentStatus.PENDING_FLA);
+            indentRequest.setAgainUpdatedAt(LocalDateTime.now());
+
         } else if ("SLA".equalsIgnoreCase(recipientType)) {
             User sla = userRepository.findById(recipientId).orElseThrow(() -> new RuntimeException("SLA not found"));
             indentRequest.setSla(sla);
             indentRequest.setStatus(IndentStatus.PENDING_SLA);
+            indentRequest.setAgainUpdatedAt(LocalDateTime.now());
         }
 
         projectRepository.save(project);
@@ -393,6 +396,7 @@ public class IndentRequestController {
 
         if (anyApproved) {
             indent.setStatus(IndentStatus.PENDING_SLA);
+            indent.setAgainUpdatedAt(LocalDateTime.now());
             indent.setSla(userRepository.findById(slaId).orElseThrow(() -> new RuntimeException("SLA not found")));
         } else if (anyRejected && !anyApproved) {
             indent.setStatus(IndentStatus.REJECTED_BY_FLA);
@@ -456,6 +460,7 @@ public class IndentRequestController {
 
         if (anyApproved) {
             indent.setStatus(IndentStatus.PENDING_STORE);
+            indent.setAgainUpdatedAt(LocalDateTime.now());
 //            indent.setStore(storeUser);  // storeUser = authenticated or fixed Store
 
 
@@ -548,6 +553,7 @@ public class IndentRequestController {
         if (anyApproved) {
             System.err.println("inside approved ");
             indent.setStatus(IndentStatus.PENDING_FINANCE);
+            indent.setAgainUpdatedAt(LocalDateTime.now());
             // Optionally assign to Finance role if needed
         } else if (anyRejected && !anyApproved) {
             System.err.println("inside rejected ");
@@ -688,6 +694,7 @@ public class IndentRequestController {
 
         if (anyApproved) {
             indent.setStatus(IndentStatus.PENDING_PURCHASE);
+            indent.setAgainUpdatedAt(LocalDateTime.now());
         } else if (anyRejected && !anyApproved) {
             indent.setStatus(IndentStatus.REJECTED_BY_FINANCE);
         }
@@ -735,6 +742,7 @@ public class IndentRequestController {
         }
 
         indent.setStatus(IndentStatus.UNDER_INSPECTION);
+        indent.setAgainUpdatedAt(LocalDateTime.now());
         indent.setUserInspectionDate(LocalDateTime.now());
         indentRequestRepository.save(indent);
 
@@ -750,7 +758,7 @@ public class IndentRequestController {
         IndentRequest indent = indentRequestRepository.findById(indentId)
                 .orElseThrow(() -> new RuntimeException("Indent not found"));
 
-        if (indent.getStatus() != IndentStatus.GFR_GENERATED) {
+        if (indent.getStatus() != IndentStatus.GRC_GENERATED) {
             return ResponseEntity.badRequest().body("GFR not generated yet");
         }
 
@@ -829,8 +837,7 @@ public class IndentRequestController {
                 .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + resource.getFilename() + "\"")
                 .body(resource);
     }
-
-
+    
     @PreAuthorize("hasAnyRole('FLA', 'SLA', 'STORE', 'FINANCE', 'PURCHASE')")
     @GetMapping("/inspectionviewer/{fileName:.+}")
     public ResponseEntity<Resource> inspectionFileViewer(@PathVariable String fileName) throws IOException {
@@ -838,7 +845,7 @@ public class IndentRequestController {
         if (fileName.contains("..")) {
             throw new SecurityException("Invalid file path: " + fileName);
         }
-
+        
         System.err.println("inside the file attachemtn endpoitnt 806");
         // Resolve file path
         Path filePath = Paths.get("uploads","inspection_reports").toAbsolutePath().normalize().resolve(fileName).normalize();
@@ -986,7 +993,7 @@ public class IndentRequestController {
 //        }
 //
 //        String remark = requestBody.get("remark");
-//        indent.setStatus(IndentStatus.PENDING_PURCHASE_GFR);
+//        indent.setStatus(IndentStatus.PENDING_PURCHASE_GRC);
 //        indent.setUserInspectionDate(LocalDateTime.now());
 //        indent.setRemarkByUser(remark);
 //
@@ -1047,7 +1054,9 @@ public class IndentRequestController {
             System.err.println(fileName);
         }
 
-        indent.setStatus(IndentStatus.PENDING_PURCHASE_GFR);
+        indent.setStatus(IndentStatus.PENDING_PURCHASE_GRC);
+//        indent.setAgainUpdatedAt(LocalDateTime.now());
+        indent.setAgainUpdatedAt(LocalDateTime.now());
         indent.setUserInspectionDate(LocalDateTime.now());
         indent.setRemarkByUser(remark);
 
@@ -1075,7 +1084,7 @@ public class IndentRequestController {
 
         indent.setGfrDetails(gfrDetails);
         indent.setGfrGeneratedDate(LocalDateTime.now());
-        indent.setStatus(IndentStatus.GFR_GENERATED);
+        indent.setStatus(IndentStatus.GRC_GENERATED);
 
         indentRequestRepository.save(indent);
         return ResponseEntity.ok(Map.of("message", "GFR generated"));
@@ -1091,7 +1100,7 @@ public class IndentRequestController {
         IndentRequest indent = indentRequestRepository.findById(indentId)
                 .orElseThrow(() -> new RuntimeException("Indent not found"));
 
-        if (indent.getStatus() != IndentStatus.GFR_GENERATED) {
+        if (indent.getStatus() != IndentStatus.GRC_GENERATED) {
             return ResponseEntity.badRequest().body("GFR not generated yet");
         }
 
@@ -1112,7 +1121,7 @@ public class IndentRequestController {
     public ResponseEntity<?> getIndentsForGFR(Authentication auth) {
         if (auth == null || !auth.isAuthenticated()) throw new AccessDeniedException("Unauthorized");
 
-        List<IndentRequest> indents = indentRequestRepository.findByStatus(IndentStatus.PENDING_PURCHASE_GFR);
+        List<IndentRequest> indents = indentRequestRepository.findByStatus(IndentStatus.PENDING_PURCHASE_GRC);
         return ResponseEntity.ok(indents);
     }
 
@@ -1143,7 +1152,7 @@ public class IndentRequestController {
         IndentRequest indent = indentRequestRepository.findById(indentId)
                 .orElseThrow(() -> new RuntimeException("Indent not found"));
 
-        if (indent.getStatus() != IndentStatus.PENDING_PURCHASE_GFR) {
+        if (indent.getStatus() != IndentStatus.PENDING_PURCHASE_GRC) {
             return ResponseEntity.badRequest().body("Not in GFR stage");
         }
 
@@ -1157,6 +1166,7 @@ public class IndentRequestController {
 
         indent.setGfrNote(gfrNote);
         indent.setStatus(IndentStatus.PENDING_FINANCE_PAYMENT);
+        indent.setAgainUpdatedAt(LocalDateTime.now());
         indent.setGfrCreatedAt(java.time.LocalDateTime.now());
 
         indentRequestRepository.save(indent);

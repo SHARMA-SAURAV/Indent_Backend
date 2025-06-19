@@ -65,6 +65,7 @@ public class IndentRequestDTO {
     // Constructor
     public IndentRequestDTO(Long id, String itemName, int quantity, Long perPieceCost, String description,
                             String flaUsername , String slaUsername, String remarkBySla, String status) {
+
         this.id = id;
         this.itemName = itemName;
         this.quantity = quantity;

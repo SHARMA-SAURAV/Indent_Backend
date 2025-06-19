@@ -382,7 +382,7 @@ public class IndentRequestService {
      * Create single indent with multiple products
      */
     public IndentRequest createMultiProductIndent(Long userId,
-                                                  String projectName,
+
                                                   String purpose,
                                                   String department,
                                                   List<ProductDTO> products,
@@ -398,7 +398,7 @@ public class IndentRequestService {
         IndentRequest indentRequest = new IndentRequest();
         indentRequest.setRequestedBy(user);
         indentRequest.setUser(user);
-        indentRequest.setProjectName(projectName);
+//        indentRequest.setProjectName(projectName);
         indentRequest.setPurpose(purpose);
         indentRequest.setDepartment(department);
         indentRequest.setStatus(IndentStatus.PENDING_FLA);

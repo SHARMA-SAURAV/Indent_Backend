@@ -237,6 +237,7 @@ public class PurchaseController {
 
         if (anyApproved && indent.isInwardEntryGenerated()) {
             indent.setStatus(IndentStatus.WAITING_FOR_USER_CONFIRMATION);
+            indent.setAgainUpdatedAt(LocalDateTime.now());
         } else if (anyRejected && !anyApproved) {
             indent.setStatus(IndentStatus.PURCHASE_REJECTED);
         } else {
@@ -292,6 +293,7 @@ public class PurchaseController {
 
         indent.setRemarkByPurchase(remark);
         indent.setStatus(IndentStatus.WAITING_FOR_USER_CONFIRMATION);
+        indent.setAgainUpdatedAt(LocalDateTime.now());
         indent.setPurchaseCompletionDate(LocalDateTime.now());
 
         indentRequestRepository.save(indent);

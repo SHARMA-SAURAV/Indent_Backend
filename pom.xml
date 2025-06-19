@@ -92,6 +92,13 @@
 			<scope>test</scope>
 		</dependency>
 
+<!--		Itext PDF-->
+		<dependency>
+			<groupId>com.itextpdf</groupId>
+			<artifactId>itext7-core</artifactId>
+			<version>8.0.3</version> <!-- or latest -->
+		</dependency>
+
 	</dependencies>
 
 	<build>

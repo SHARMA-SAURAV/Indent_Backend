@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 public interface IndentRequestRepository extends JpaRepository<IndentRequest, Long> {
@@ -84,6 +85,12 @@ public interface IndentRequestRepository extends JpaRepository<IndentRequest, Lo
     List<IndentRequest> findByStatusInAndStore(@Param("statuses") List<IndentStatus> statuses, @Param("userId") Long userId);
     @Query("SELECT i FROM IndentRequest i WHERE i.status IN :statuses AND i.purchase.id = :userId")
     List<IndentRequest> findByStatusInAndPurchase(@Param("statuses") List<IndentStatus> statuses, @Param("userId") Long userId);
+
+
+//    List<IndentRequest> findByStatusAndCreatedAtBefore(IndentStatus status, LocalDateTime dateTime);
+        List<IndentRequest> findByStatusAndUpdatedAtBefore(IndentStatus status, LocalDateTime updatedAt);
+
+
 
 
 }
